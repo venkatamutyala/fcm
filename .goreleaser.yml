@@ -1,0 +1,50 @@
+version: 2
+
+project_name: fcm
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: fcm
+    main: ./cmd/fcm
+    binary: fcm
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.Version={{.Version}}
+
+archives:
+  - id: fcm
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^ci:"
+      - "^chore:"
+      - "^test:"
+
+release:
+  github:
+    owner: venkatamutyala
+    name: fcm
+  draft: false
+  prerelease: auto
+  name_template: "{{ .Tag }}"
+  extra_files:
+    - glob: dist/*.sig
+    - glob: dist/*.pem
