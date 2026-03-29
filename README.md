@@ -2,39 +2,69 @@
 
 The CLI for [Firecracker](https://github.com/firecracker-microvm/firecracker) microVMs. One command to launch a full Linux VM with SSH access.
 
-Unlike containers, each VM runs its own Linux kernel with full isolation. Unlike QEMU/libvirt, boot time is seconds and memory overhead is minimal.
-
-## Quick Start
+<!-- TODO: Replace with actual asciinema recording
+[![asciicast](https://asciinema.org/a/XXXXX.svg)](https://asciinema.org/a/XXXXX)
+-->
 
 ```bash
-# Requirements: Linux with /dev/kvm
-# Install dependencies (one-time)
-sudo apt-get install -y qemu-utils fdisk e2fsprogs mtools   # Debian/Ubuntu
-# sudo dnf install -y qemu-img util-linux e2fsprogs mtools  # Fedora/RHEL
+$ sudo fcm run myvm --image ubuntu-24.04
+  Downloading ubuntu-24.04... 342/680 MB  12.3 MB/s
+  Preparing rootfs (10 GB)...
+  Generating cloud-init...
+  Starting myvm...
+  Waiting for VM to boot... (3.2s)
+  VM ready! (booted in 3.2s)
 
-# Download fcm (or build from source: make docker-build && make build)
-sudo cp bin/fcm /usr/local/bin/fcm
+root@myvm:~# uname -a
+Linux myvm 6.1.102 #1 SMP x86_64 GNU/Linux
+```
+
+Unlike containers, each VM runs its own Linux kernel with full isolation. Unlike QEMU/libvirt, boot time is seconds and memory overhead is minimal.
+
+## Install
+
+```bash
+# One-line install (Linux x86_64 or arm64, requires /dev/kvm)
+curl -fsSL https://raw.githubusercontent.com/venkatamutyala/fcm/main/install.sh | sudo bash
 
 # One-time setup — downloads Firecracker + kernel, configures networking
 sudo fcm init
-
-# Create a VM (first run downloads ~700MB cloud image)
-sudo fcm create myvm --image ubuntu-24.04 --ssh-key ~/.ssh/id_ed25519.pub
-#  VM myvm created and started:
-#    IP:     192.168.100.10
-#    CPUs:   2
-#    Memory: 1024 MB
-#    Disk:   10 GB
-#
-#  Access:
-#    SSH:     ssh root@192.168.100.10
-#    Console: fcm console myvm
-
-# SSH in
-sudo fcm ssh myvm
 ```
 
+That's it. Now create a VM:
+
+```bash
+# Launch a VM and SSH in (auto-detects your SSH key)
+sudo fcm run myvm --image ubuntu-24.04
+```
+
+Or step by step:
+
+```bash
+sudo fcm create myvm --image ubuntu-24.04    # Create VM
+sudo fcm ssh myvm                            # SSH in
+sudo fcm stop myvm                           # Stop
+sudo fcm delete myvm --force                 # Delete
+```
+
+## Why fcm?
+
+| | fcm | Docker | Vagrant | multipass | LXD/Incus |
+|---|---|---|---|---|---|
+| Real kernel isolation | Yes | No | Yes | Yes | Partial |
+| Boot time | ~3s | ~0s | ~30s | ~15s | ~5s |
+| Memory overhead | ~50MB | ~0 | ~512MB | ~512MB | ~100MB |
+| Single binary | Yes | No | No | No | No |
+| No daemon required | Yes | No | Yes | No | No |
+| Multi-distro images | Yes | Yes | Yes | Ubuntu only | Yes |
+| Runs on bare metal | Yes | Yes | Yes | Yes | Yes |
+| Cloud-init support | Yes | No | Yes | Yes | Yes |
+
 ## Supported Images
+
+```bash
+sudo fcm images --available    # List all pullable images
+```
 
 | Image | Filesystem | Tested |
 |-------|-----------|--------|
@@ -48,24 +78,37 @@ sudo fcm ssh myvm
 
 ## Commands
 
-```
-fcm init                          # One-time setup
+```bash
+# The basics
+fcm run <name> --image <img>      # Create + wait for SSH + connect (one command)
 fcm create <name> --image <img>   # Create and start a VM
 fcm list                          # List all VMs
 fcm ssh <name>                    # SSH into a VM
+fcm exec <name> -- <cmd>          # Run a command in a VM
 fcm console <name>                # Serial console (Ctrl+] to detach)
+
+# Lifecycle
 fcm stop <name>                   # Stop a VM
 fcm start <name>                  # Start a stopped VM
 fcm restart <name>                # Restart a VM
-fcm delete <name> [--force]       # Delete a VM (--force if running)
-fcm inspect <name>                # Show VM details (JSON)
-fcm logs <name> [--follow]        # View systemd logs
+fcm delete <name> [--force]       # Delete a VM
+fcm resize <name> --cpus 4        # Resize CPU/memory/disk
+
+# Images
+fcm images                        # List local images
+fcm images --available            # List all pullable images
+fcm pull <image>                  # Download a cloud image
+
+# Backups
 fcm backup <name>                 # Backup VM disk
 fcm restore <name> <backup>       # Restore from backup
-fcm backups <name>                # List backups
-fcm images                        # List local images
-fcm pull <image>                  # Download a cloud image
-fcm doctor                        # Check system readiness
+
+# System
+fcm init                          # One-time setup
+fcm doctor                        # System health check
+fcm cleanup --confirm             # Remove all VMs and FCM state
+fcm inspect <name>                # VM details (JSON)
+fcm logs <name> [--follow]        # systemd logs
 fcm version                       # Print version
 ```
 
@@ -104,7 +147,6 @@ Cloud-init configures SSH keys, hostname, and networking via a CIDATA vfat disk 
 ## Custom Cloud-Init
 
 ```bash
-# Use a custom cloud-init config
 fcm create myvm --image ubuntu-24.04 --cloud-init ./my-config.yaml
 ```
 
@@ -112,6 +154,23 @@ Example templates in `env/`:
 - `env/tailscale.yaml` — install and join a Tailscale network
 - `env/docker.yaml` — install Docker CE
 - `env/base.yaml` — minimal template
+
+## What `fcm init` Does
+
+Transparency matters when a tool runs as root. Here is exactly what `fcm init` does to your system:
+
+1. Checks and installs required host packages (`qemu-utils`, `mtools`, etc.)
+2. Creates `/var/lib/fcm/` directory structure
+3. Downloads the Firecracker binary to `/usr/local/bin/firecracker`
+4. Downloads a Linux kernel to `/var/lib/fcm/kernels/vmlinux-default`
+5. Writes `/var/lib/fcm/config.json` with default settings
+6. Creates a network bridge `fcbr0` with IP `192.168.100.1/24`
+7. Adds iptables NAT rules for VM internet access
+8. Installs and starts systemd services:
+   - `fcm-bridge.service` — manages the network bridge
+   - `fcm-dhcp.service` — embedded DHCP server for VMs
+
+To fully undo: `sudo fcm cleanup --confirm`
 
 ## Development
 
@@ -127,21 +186,6 @@ docker build -t fcm-kernel -f kernel/Dockerfile kernel/
 # Cross-compile
 make release        # Builds linux-amd64 and linux-arm64
 ```
-
-## What `fcm init` Does
-
-Transparency matters when a tool runs as root. Here is exactly what `fcm init` does to your system:
-
-1. Creates `/var/lib/fcm/` directory structure
-2. Downloads the Firecracker binary to `/usr/local/bin/firecracker`
-3. Downloads a Linux kernel to `/var/lib/fcm/kernels/vmlinux-default`
-4. Writes `/var/lib/fcm/config.json` with default settings
-5. Creates a network bridge `fcbr0` with IP `192.168.100.1/24`
-6. Adds iptables NAT rules for VM internet access
-7. Installs three systemd services:
-   - `fcm-bridge.service` — manages the network bridge
-   - `fcm-dhcp.service` — embedded DHCP server for VMs
-   - `fcm-vm-<name>.service` — one per VM (created by `fcm create`)
 
 ## License
 
