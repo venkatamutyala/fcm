@@ -1,0 +1,15 @@
+linters-settings:
+  errcheck:
+    exclude-functions:
+      - os.Remove
+      - os.RemoveAll
+      - os.MkdirAll
+      - (io.Closer).Close
+      - (*os.File).Close
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused

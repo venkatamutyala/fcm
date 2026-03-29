@@ -76,7 +76,7 @@ var setupVMCmd = &cobra.Command{
 
 		// Run e2fsck on rootfs to fix any journal issues from unclean shutdown
 		// This prevents systemd from seeing stale state on the next boot
-		exec.Command("e2fsck", "-fy", v.RootfsPath).Run()
+		_ = exec.Command("e2fsck", "-fy", v.RootfsPath).Run()
 
 		// Create TAP device and attach to bridge
 		if err := network.CreateTAP(v.TAPDevice, cfg.BridgeName); err != nil {
