@@ -114,7 +114,7 @@ func ensureNAT(cfg *config.Config) error {
 }
 
 func removeNAT(cfg *config.Config) {
-	exec.Command("iptables", "-t", "nat", "-D", "POSTROUTING",
+	_ = exec.Command("iptables", "-t", "nat", "-D", "POSTROUTING",
 		"-s", cfg.BridgeSubnet, "!", "-o", cfg.BridgeName,
 		"-j", "MASQUERADE").Run()
 }
@@ -126,7 +126,7 @@ func removeForwardRules(cfg *config.Config) {
 		{"-D", "FORWARD", "!", "-i", cfg.BridgeName, "-o", cfg.BridgeName, "-j", "ACCEPT"},
 	}
 	for _, rule := range rules {
-		exec.Command("iptables", rule...).Run()
+		_ = exec.Command("iptables", rule...).Run()
 	}
 }
 

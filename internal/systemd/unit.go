@@ -114,7 +114,7 @@ func RemoveVMUnit(vmName string) error {
 	}
 
 	// Disable first (ignore errors)
-	exec.Command("systemctl", "disable", VMUnitName(vmName)).Run()
+	_ = exec.Command("systemctl", "disable", VMUnitName(vmName)).Run()
 
 	if err := os.Remove(path); err != nil {
 		return fmt.Errorf("remove vm unit: %w", err)
