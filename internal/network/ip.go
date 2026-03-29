@@ -59,6 +59,59 @@ func BootArgs() string {
 	return "console=ttyS0 reboot=k panic=1 net.ifnames=0 biosdevname=0"
 }
 
+// ValidateIP checks that the given IP address is valid for use by a VM:
+// it must be a valid IPv4 address, within the configured subnet, not the
+// gateway (bridge) IP, and not already in use by another VM.
+func ValidateIP(ipStr string, cfg *config.Config) error {
+	ip := net.ParseIP(ipStr)
+	if ip == nil || ip.To4() == nil {
+		return fmt.Errorf("%q is not a valid IPv4 address", ipStr)
+	}
+
+	_, ipNet, err := net.ParseCIDR(cfg.BridgeSubnet)
+	if err != nil {
+		return fmt.Errorf("parse subnet %q: %w", cfg.BridgeSubnet, err)
+	}
+
+	if !ipNet.Contains(ip) {
+		return fmt.Errorf("%s is not within subnet %s", ipStr, cfg.BridgeSubnet)
+	}
+
+	if ipStr == cfg.BridgeIP {
+		return fmt.Errorf("%s is the gateway (bridge) IP and cannot be assigned to a VM", ipStr)
+	}
+
+	// Check the IP is not the network address or broadcast
+	ipv4 := ip.To4()
+	networkIP := ipNet.IP.To4()
+	ones, bits := ipNet.Mask.Size()
+	if ones < bits {
+		// Check network address
+		if ipv4.Equal(networkIP) {
+			return fmt.Errorf("%s is the network address", ipStr)
+		}
+		// Check broadcast: set all host bits to 1
+		broadcast := make(net.IP, 4)
+		for i := range broadcast {
+			broadcast[i] = networkIP[i] | ^ipNet.Mask[i]
+		}
+		if ipv4.Equal(broadcast) {
+			return fmt.Errorf("%s is the broadcast address", ipStr)
+		}
+	}
+
+	used, err := usedIPs()
+	if err != nil {
+		return fmt.Errorf("check used IPs: %w", err)
+	}
+
+	if used[ipStr] {
+		return fmt.Errorf("%s is already in use by another VM", ipStr)
+	}
+
+	return nil
+}
+
 func usedIPs() (map[string]bool, error) {
 	vms, err := vm.LoadAllVMs()
 	if err != nil {

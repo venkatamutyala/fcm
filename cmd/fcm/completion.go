@@ -2,6 +2,7 @@ package main
 
 import (
 	"fcm.dev/fcm-cli/internal/images"
+	"fcm.dev/fcm-cli/internal/templates"
 	"fcm.dev/fcm-cli/internal/vm"
 	"github.com/spf13/cobra"
 )
@@ -42,4 +43,11 @@ func init() {
 
 	// Register image name completion for pull command
 	pullCmd.ValidArgsFunction = completeImageNames
+
+	// Register template name completion on --template flag for create and run
+	completeTemplateNames := func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return templates.Names(), cobra.ShellCompDirectiveNoFileComp
+	}
+	_ = createCmd.RegisterFlagCompletionFunc("template", completeTemplateNames)
+	_ = runCmd.RegisterFlagCompletionFunc("template", completeTemplateNames)
 }

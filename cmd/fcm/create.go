@@ -13,17 +13,20 @@ import (
 	"fcm.dev/fcm-cli/internal/images"
 	"fcm.dev/fcm-cli/internal/network"
 	"fcm.dev/fcm-cli/internal/systemd"
+	"fcm.dev/fcm-cli/internal/templates"
 	"fcm.dev/fcm-cli/internal/vm"
 	"github.com/spf13/cobra"
 )
 
 var createFlags struct {
-	image     string
-	cpus      int
-	memory    int
-	disk      int
-	sshKey    string
+	image    string
+	cpus     int
+	memory   int
+	disk     int
+	sshKey   string
 	cloudInit string
+	ip       string
+	template string
 }
 
 var createCmd = &cobra.Command{
@@ -40,7 +43,8 @@ func init() {
 	createCmd.Flags().IntVar(&createFlags.disk, "disk", 0, "Disk size in GB (default from config)")
 	createCmd.Flags().StringVar(&createFlags.sshKey, "ssh-key", "", "Path to SSH public key")
 	createCmd.Flags().StringVar(&createFlags.cloudInit, "cloud-init", "", "Path to cloud-init YAML file")
-	_ = createCmd.MarkFlagRequired("image")
+	createCmd.Flags().StringVar(&createFlags.ip, "ip", "", "Static IP address for the VM (must be within configured subnet)")
+	createCmd.Flags().StringVar(&createFlags.template, "template", "", "Use a built-in template (see: fcm templates)")
 	rootCmd.AddCommand(createCmd)
 }
 
@@ -68,18 +72,48 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		return fcmerrors.WithBridgeHint(fmt.Errorf("network bridge %s not found", cfg.BridgeName))
 	}
 
-	// Apply defaults
+	// Resolve template
+	var tmpl *templates.Template
+	if createFlags.template != "" {
+		tmpl = templates.Get(createFlags.template)
+		if tmpl == nil {
+			return fmt.Errorf("unknown template %q (see available templates with: fcm templates)", createFlags.template)
+		}
+		// Template provides image if --image not explicitly set
+		if createFlags.image == "" {
+			createFlags.image = tmpl.Image
+		}
+	}
+
+	// --image is required if no template is set
+	if createFlags.image == "" {
+		return fmt.Errorf("--image is required (or use --template)")
+	}
+
+	// Apply defaults: template values override config defaults, explicit flags override everything
 	cpus := createFlags.cpus
 	if cpus == 0 {
-		cpus = cfg.DefaultCPUs
+		if tmpl != nil && tmpl.CPUs > 0 {
+			cpus = tmpl.CPUs
+		} else {
+			cpus = cfg.DefaultCPUs
+		}
 	}
 	memory := createFlags.memory
 	if memory == 0 {
-		memory = cfg.DefaultMemoryMB
+		if tmpl != nil && tmpl.Memory > 0 {
+			memory = tmpl.Memory
+		} else {
+			memory = cfg.DefaultMemoryMB
+		}
 	}
 	disk := createFlags.disk
 	if disk == 0 {
-		disk = cfg.DefaultDiskGB
+		if tmpl != nil && tmpl.Disk > 0 {
+			disk = tmpl.Disk
+		} else {
+			disk = cfg.DefaultDiskGB
+		}
 	}
 
 	// Validate
@@ -118,10 +152,19 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	// The rest must happen under a lock to prevent IP races
 	var v *vm.VM
 	err = vm.WithLock(func() error {
-		// Allocate IP
-		ip, err := network.AllocateIP(cfg)
-		if err != nil {
-			return err
+		// Allocate or validate IP
+		var ip string
+		if createFlags.ip != "" {
+			if err := network.ValidateIP(createFlags.ip, cfg); err != nil {
+				return fmt.Errorf("invalid --ip: %w", err)
+			}
+			ip = createFlags.ip
+		} else {
+			var err error
+			ip, err = network.AllocateIP(cfg)
+			if err != nil {
+				return err
+			}
 		}
 
 		mac := network.MACFromIP(ip)
@@ -179,13 +222,36 @@ func runCreate(cmd *cobra.Command, args []string) error {
 
 	// Generate cloud-init CIDATA disk — handles SSH keys, networking, hostname
 	fmt.Println("Generating cloud-init...")
+	cloudInitFile := createFlags.cloudInit
+
+	// If using a template with cloud-init and no explicit --cloud-init, generate merged user-data
+	if cloudInitFile == "" && tmpl != nil && tmpl.CloudInit != "" {
+		baseUserData := cloudinit.DefaultUserData(name, sshPubKey)
+		merged := templates.MergeCloudInit(baseUserData, tmpl.CloudInit)
+
+		tmpFile, err := os.CreateTemp("", "fcm-template-ci-*.yaml")
+		if err != nil {
+			rollback()
+			return fmt.Errorf("create temp cloud-init: %w", err)
+		}
+		defer os.Remove(tmpFile.Name())
+
+		if _, err := tmpFile.WriteString(merged); err != nil {
+			tmpFile.Close()
+			rollback()
+			return fmt.Errorf("write temp cloud-init: %w", err)
+		}
+		tmpFile.Close()
+		cloudInitFile = tmpFile.Name()
+	}
+
 	netCfg := &cloudinit.NetworkConfig{
 		IP:      v.IP,
 		Gateway: v.Gateway,
 		Mask:    cfg.BridgeMask,
 		DNS:     cfg.DNS,
 	}
-	if err := cloudinit.GenerateCloudInitDisk(v.CIDataPath, name, sshPubKey, createFlags.cloudInit, netCfg); err != nil {
+	if err := cloudinit.GenerateCloudInitDisk(v.CIDataPath, name, sshPubKey, cloudInitFile, netCfg); err != nil {
 		rollback()
 		return fmt.Errorf("generate cloud-init: %w", err)
 	}

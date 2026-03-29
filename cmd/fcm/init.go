@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -19,7 +20,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var initYes bool
+var initYes    bool
+var initSubnet  string
+var initBridgeIP string
 
 const (
 	// Firecracker release to download
@@ -40,6 +43,8 @@ var initCmd = &cobra.Command{
 
 func init() {
 	initCmd.Flags().BoolVar(&initYes, "yes", false, "Auto-install missing dependencies without prompting")
+	initCmd.Flags().StringVar(&initSubnet, "subnet", "192.168.100.0/24", "Subnet CIDR for the VM bridge network")
+	initCmd.Flags().StringVar(&initBridgeIP, "bridge-ip", "", "Bridge gateway IP (default: first usable IP in subnet)")
 	rootCmd.AddCommand(initCmd)
 }
 
@@ -90,6 +95,40 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	cfg.FirecrackerVersion = firecrackerVersion
 	cfg.FCMVersion = Version
+
+	// Apply custom subnet settings
+	if initSubnet != config.DefaultBridgeSubnet || initBridgeIP != "" {
+		ip, ipNet, err := net.ParseCIDR(initSubnet)
+		if err != nil {
+			return fmt.Errorf("invalid --subnet %q: %w", initSubnet, err)
+		}
+		_ = ip
+
+		cfg.BridgeSubnet = initSubnet
+		cfg.BridgeMask = net.IP(ipNet.Mask).String()
+
+		if initBridgeIP != "" {
+			bridgeIP := net.ParseIP(initBridgeIP)
+			if bridgeIP == nil {
+				return fmt.Errorf("invalid --bridge-ip %q", initBridgeIP)
+			}
+			if !ipNet.Contains(bridgeIP) {
+				return fmt.Errorf("--bridge-ip %s is not within subnet %s", initBridgeIP, initSubnet)
+			}
+			cfg.BridgeIP = initBridgeIP
+		} else {
+			// Derive first usable IP: network address + 1
+			firstIP := ipNet.IP.To4()
+			if firstIP == nil {
+				return fmt.Errorf("subnet %s is not IPv4", initSubnet)
+			}
+			firstUsable := make(net.IP, len(firstIP))
+			copy(firstUsable, firstIP)
+			firstUsable[3]++
+			cfg.BridgeIP = firstUsable.String()
+		}
+	}
+
 	if err := config.Save(cfg); err != nil {
 		return err
 	}

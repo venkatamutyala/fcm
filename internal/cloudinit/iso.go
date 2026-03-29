@@ -113,14 +113,32 @@ func maskToCIDRBits(mask string) string {
 	}
 }
 
+// DefaultUserData generates the base cloud-init user-data with hostname,
+// SSH key, and root password configuration.
+func DefaultUserData(hostname, sshPubKey string) string {
+	return defaultUserData(hostname, sshPubKey)
+}
+
 func defaultUserData(hostname, sshPubKey string) string {
 	cfg := "#cloud-config\n"
 	cfg += fmt.Sprintf("hostname: %s\n", hostname)
 	cfg += "manage_etc_hosts: true\n"
 
-	// Root SSH key at top level (works across all distros including RHEL)
+	// Configure root user explicitly with SSH key
+	// Using the users directive ensures the key goes to root,
+	// not the distro's default user (ubuntu, cloud-user, etc.)
+	cfg += "users:\n"
+	cfg += "  - name: root\n"
+	cfg += "    lock_passwd: false\n"
 	if sshPubKey != "" {
 		sshPubKey = strings.TrimSpace(sshPubKey)
+		cfg += "    ssh_authorized_keys:\n"
+		cfg += fmt.Sprintf("      - %s\n", sshPubKey)
+	}
+
+	// Also inject at top level for distros where users directive
+	// doesn't apply to root (belt and suspenders)
+	if sshPubKey != "" {
 		cfg += "ssh_authorized_keys:\n"
 		cfg += fmt.Sprintf("  - %s\n", sshPubKey)
 	}
@@ -134,7 +152,6 @@ func defaultUserData(hostname, sshPubKey string) string {
 	// SSH and root config
 	cfg += "ssh_pwauth: true\n"
 	cfg += "disable_root: false\n"
-	cfg += "lock_passwd: false\n"
 
 	return cfg
 }

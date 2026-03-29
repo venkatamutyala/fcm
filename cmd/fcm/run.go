@@ -11,12 +11,13 @@ import (
 )
 
 var runFlags struct {
-	image     string
-	cpus      int
-	memory    int
-	disk      int
-	sshKey    string
+	image    string
+	cpus     int
+	memory   int
+	disk     int
+	sshKey   string
 	cloudInit string
+	template string
 }
 
 var runCmd = &cobra.Command{
@@ -34,7 +35,7 @@ func init() {
 	runCmd.Flags().IntVar(&runFlags.disk, "disk", 0, "Disk size in GB (default from config)")
 	runCmd.Flags().StringVar(&runFlags.sshKey, "ssh-key", "", "Path to SSH public key")
 	runCmd.Flags().StringVar(&runFlags.cloudInit, "cloud-init", "", "Path to cloud-init YAML file")
-	_ = runCmd.MarkFlagRequired("image")
+	runCmd.Flags().StringVar(&runFlags.template, "template", "", "Use a built-in template (see: fcm templates)")
 	rootCmd.AddCommand(runCmd)
 }
 
@@ -46,6 +47,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	createFlags.disk = runFlags.disk
 	createFlags.sshKey = runFlags.sshKey
 	createFlags.cloudInit = runFlags.cloudInit
+	createFlags.template = runFlags.template
 
 	// Run the create flow (includes auto-detect SSH key and waitForSSH)
 	if err := runCreate(cmd, args); err != nil {
