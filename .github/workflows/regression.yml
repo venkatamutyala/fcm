@@ -1,0 +1,101 @@
+name: Regression Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -la /dev/kvm
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Build fcm
+        run: go build -ldflags "-s -w -X main.Version=test" -o fcm ./cmd/fcm
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-utils fdisk e2fsprogs mtools dosfstools
+
+      - name: Install fcm
+        run: sudo cp fcm /usr/local/bin/fcm
+
+      - name: Run fcm init
+        run: sudo fcm init --yes
+
+      - name: Check fcm doctor
+        run: sudo fcm doctor
+
+      - name: Generate SSH key
+        run: ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N "" -q
+
+      - name: Pull Ubuntu 24.04
+        run: sudo fcm pull ubuntu-24.04
+
+      - name: Test create + SSH
+        run: |
+          sudo fcm create test-vm --image ubuntu-24.04 --ssh-key ~/.ssh/id_ed25519.pub
+          echo "Waiting for VM to boot..."
+          sleep 60
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o IdentitiesOnly=yes -o ConnectTimeout=10 \
+            -i ~/.ssh/id_ed25519 root@192.168.100.10 \
+            "echo 'SSH OK'; hostname; cat /etc/os-release | head -1"
+
+      - name: Test stop + start + SSH
+        run: |
+          sudo fcm stop test-vm
+          sudo fcm list
+          sudo fcm start test-vm
+          echo "Waiting for restart..."
+          sleep 60
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o IdentitiesOnly=yes -o ConnectTimeout=10 \
+            -i ~/.ssh/id_ed25519 root@192.168.100.10 \
+            "echo 'RESTART SSH OK'; uptime"
+
+      - name: Test exec
+        run: |
+          sudo fcm exec test-vm -- hostname
+          sudo fcm exec test-vm -- cat /etc/os-release | head -1
+
+      - name: Test backup + restore
+        run: |
+          sudo fcm backup test-vm
+          sudo fcm backups test-vm
+
+      - name: Test inspect + logs
+        run: |
+          sudo fcm inspect test-vm
+          sudo fcm logs test-vm | tail -5
+
+      - name: Test delete
+        run: |
+          sudo fcm delete test-vm --force
+          sudo fcm list
+
+      - name: Test cleanup
+        run: sudo fcm cleanup --confirm
+
+      - name: Print results
+        if: always()
+        run: echo "Regression test complete"
