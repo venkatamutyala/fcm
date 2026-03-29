@@ -72,6 +72,13 @@ jobs:
         with:
           name: fcm-binary
 
+      - name: Set VM name
+        run: |
+          # Sanitize image name for use as VM name (replace dots with dashes)
+          VM_NAME="test-$(echo '${{ matrix.image }}' | tr '.' '-')"
+          echo "VM_NAME=$VM_NAME" >> $GITHUB_ENV
+          echo "Using VM name: $VM_NAME"
+
       - name: Install fcm and dependencies
         run: |
           chmod +x fcm
@@ -93,7 +100,7 @@ jobs:
 
       - name: "Test: create"
         run: |
-          sudo fcm create test-${{ matrix.image }} \
+          sudo fcm create ${{ env.VM_NAME }} \
             --image ${{ matrix.image }} \
             --ssh-key ~/.ssh/id_ed25519.pub
           sudo fcm list
@@ -111,22 +118,22 @@ jobs:
             sleep 5
           done
           echo "SSH failed after 120s"
-          sudo tail -50 /var/lib/fcm/vms/test-${{ matrix.image }}/console.log || true
+          sudo tail -50 /var/lib/fcm/vms/${{ env.VM_NAME }}/console.log || true
           exit 1
 
       - name: "Test: exec"
         run: |
-          sudo fcm exec test-${{ matrix.image }} -- hostname
-          sudo fcm exec test-${{ matrix.image }} -- cat /etc/os-release
+          sudo fcm exec ${{ env.VM_NAME }} -- hostname
+          sudo fcm exec ${{ env.VM_NAME }} -- cat /etc/os-release
 
       - name: "Test: inspect"
-        run: sudo fcm inspect test-${{ matrix.image }}
+        run: sudo fcm inspect ${{ env.VM_NAME }}
 
       - name: "Test: stop + start"
         run: |
-          sudo fcm stop test-${{ matrix.image }}
+          sudo fcm stop ${{ env.VM_NAME }}
           sudo fcm list | grep stopped
-          sudo fcm start test-${{ matrix.image }}
+          sudo fcm start ${{ env.VM_NAME }}
           sudo fcm list | grep running
 
       - name: "Test: SSH (after restart)"
@@ -142,17 +149,17 @@ jobs:
             sleep 5
           done
           echo "SSH failed after 120s"
-          sudo tail -50 /var/lib/fcm/vms/test-${{ matrix.image }}/console.log || true
+          sudo tail -50 /var/lib/fcm/vms/${{ env.VM_NAME }}/console.log || true
           exit 1
 
       - name: "Test: backup + restore"
         run: |
-          sudo fcm backup test-${{ matrix.image }}
-          sudo fcm backups test-${{ matrix.image }}
+          sudo fcm backup ${{ env.VM_NAME }}
+          sudo fcm backups ${{ env.VM_NAME }}
 
       - name: "Test: delete"
         run: |
-          sudo fcm delete test-${{ matrix.image }} --force
+          sudo fcm delete ${{ env.VM_NAME }} --force
           sudo fcm list | grep -q "No VMs" && echo "Delete OK"
 
       - name: Collect logs on failure
@@ -163,9 +170,9 @@ jobs:
           echo "=== fcm doctor ==="
           sudo fcm doctor || true
           echo "=== console.log ==="
-          sudo cat /var/lib/fcm/vms/test-${{ matrix.image }}/console.log 2>/dev/null | tail -100 || true
+          sudo cat /var/lib/fcm/vms/${{ env.VM_NAME }}/console.log 2>/dev/null | tail -100 || true
           echo "=== systemd status ==="
-          sudo systemctl status fcm-vm-test-${{ matrix.image }}.service 2>/dev/null || true
+          sudo systemctl status fcm-vm-${{ env.VM_NAME }}.service 2>/dev/null || true
           echo "=== DHCP logs ==="
           sudo journalctl -u fcm-dhcp.service --no-pager -n 20 || true
 
