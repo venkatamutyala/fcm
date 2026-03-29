@@ -247,11 +247,13 @@ func patchRootfsForFirecracker(ext4Path string) error {
 			}
 		}
 
-		// Fix SSH for VM restarts: Ubuntu 24.04's ssh.socket doesn't reliably
-		// accept connections after Firecracker VM power cycles. Disable ssh.socket,
-		// remove its generator, and start sshd via cron @reboot instead.
+		// Fix boot hangs and SSH for VM restarts
 		systemdDir := filepath.Join(mountDir, "etc", "systemd", "system")
 		_ = os.MkdirAll(systemdDir, 0755)
+
+		// Disable networkd-wait-online — kernel ip= handles early networking,
+		// and this service hangs for minutes waiting for networkd to configure
+		_ = os.Symlink("/dev/null", filepath.Join(systemdDir, "systemd-networkd-wait-online.service"))
 
 		// Mask ssh.socket
 		socketsWants := filepath.Join(systemdDir, "sockets.target.wants")
