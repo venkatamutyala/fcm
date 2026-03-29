@@ -36,7 +36,7 @@ func init() {
 	resizeCmd.ValidArgsFunction = completeVMNames
 
 	// Register image name completion on --image flag for create
-	createCmd.RegisterFlagCompletionFunc("image", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	_ = createCmd.RegisterFlagCompletionFunc("image", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return images.AvailableImages(), cobra.ShellCompDirectiveNoFileComp
 	})
 
