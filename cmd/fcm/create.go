@@ -38,7 +38,7 @@ func init() {
 	createCmd.Flags().IntVar(&createFlags.disk, "disk", 0, "Disk size in GB (default from config)")
 	createCmd.Flags().StringVar(&createFlags.sshKey, "ssh-key", "", "Path to SSH public key")
 	createCmd.Flags().StringVar(&createFlags.cloudInit, "cloud-init", "", "Path to cloud-init YAML file")
-	createCmd.MarkFlagRequired("image")
+	_ = createCmd.MarkFlagRequired("image")
 	rootCmd.AddCommand(createCmd)
 }
 

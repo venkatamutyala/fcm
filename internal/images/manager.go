@@ -130,7 +130,7 @@ func Pull(name string) error {
 		}
 	} else if fsType == "xfs" {
 		// xfs_repair -n is the read-only check
-		exec.Command("xfs_repair", "-n", destPath).Run()
+		_ = exec.Command("xfs_repair", "-n", destPath).Run()
 	}
 	fmt.Printf("Filesystem: %s\n", fsType)
 
@@ -222,14 +222,14 @@ func patchRootfsForFirecracker(ext4Path string) error {
 	if out, err := exec.Command("mount", "-o", "loop", ext4Path, mountDir).CombinedOutput(); err != nil {
 		return fmt.Errorf("mount: %s: %w", string(out), err)
 	}
-	defer exec.Command("umount", mountDir).Run()
+	defer func() { _ = exec.Command("umount", mountDir).Run() }()
 
 	// Enable PermitRootLogin — must be in image, not cloud-init runcmd,
 	// because sshd starts before runcmd executes.
 	if _, err := os.Stat(filepath.Join(mountDir, "etc", "ssh")); err == nil {
 		sshdConfDir := filepath.Join(mountDir, "etc", "ssh", "sshd_config.d")
-		os.MkdirAll(sshdConfDir, 0755)
-		os.WriteFile(filepath.Join(sshdConfDir, "99-fcm.conf"), []byte("PermitRootLogin yes\nPasswordAuthentication yes\n"), 0644)
+		_ = os.MkdirAll(sshdConfDir, 0755)
+		_ = os.WriteFile(filepath.Join(sshdConfDir, "99-fcm.conf"), []byte("PermitRootLogin yes\nPasswordAuthentication yes\n"), 0644)
 	}
 
 	// Fix fstab: we extracted just the root partition from a full disk image.
@@ -249,7 +249,7 @@ func patchRootfsForFirecracker(ext4Path string) error {
 			}
 			// drop everything else (boot, efi, swap, etc.)
 		}
-		os.WriteFile(fstabPath, []byte(strings.Join(lines, "\n")), 0644)
+		_ = os.WriteFile(fstabPath, []byte(strings.Join(lines, "\n")), 0644)
 	}
 
 	if out, err := exec.Command("umount", mountDir).CombinedOutput(); err != nil {
@@ -268,7 +268,7 @@ func detectFS(path string) string {
 	defer f.Close()
 
 	buf := make([]byte, 65536)
-	f.Read(buf)
+	_, _ = f.Read(buf)
 
 	// ext2/3/4: magic 0xEF53 at offset 0x438
 	if len(buf) > 0x43A && buf[0x438] == 0x53 && buf[0x439] == 0xEF {
@@ -359,8 +359,8 @@ func CopyForVM(imageName, destPath string, diskGB int) error {
 		if out, err := exec.Command("mount", "-o", "loop", destPath, tmpMount).CombinedOutput(); err != nil {
 			return fmt.Errorf("mount xfs for resize: %s: %w", string(out), err)
 		}
-		exec.Command("xfs_growfs", tmpMount).Run()
-		exec.Command("umount", tmpMount).Run()
+		_ = exec.Command("xfs_growfs", tmpMount).Run()
+		_ = exec.Command("umount", tmpMount).Run()
 	}
 
 	return nil

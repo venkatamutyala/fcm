@@ -87,7 +87,7 @@ func runBackup(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		// Restart even on failure
 		if wasRunning {
-			systemd.Start(unit)
+			_ = systemd.Start(unit)
 		}
 		return err
 	}

@@ -70,7 +70,7 @@ func runConsole(cmd *cobra.Command, args []string) error {
 
 	// Copy socket -> stdout
 	go func() {
-		io.Copy(os.Stdout, conn)
+		_, _ = io.Copy(os.Stdout, conn)
 		close(done)
 	}()
 
@@ -88,7 +88,7 @@ func runConsole(cmd *cobra.Command, args []string) error {
 				conn.Close()
 				return
 			}
-			conn.Write(buf[:n])
+			_, _ = conn.Write(buf[:n])
 		}
 	}()
 
@@ -121,5 +121,5 @@ func makeRaw(fd int) (*unix.Termios, error) {
 }
 
 func restoreTerminal(fd int, state *unix.Termios) {
-	unix.IoctlSetTermios(fd, unix.TCSETS, state)
+	_ = unix.IoctlSetTermios(fd, unix.TCSETS, state)
 }
