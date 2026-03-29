@@ -187,7 +187,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 			CIDataPath: filepath.Join(vmDir, "cidata.iso"),
 			SerialLog:  filepath.Join(vmDir, "console.log"),
 			CreatedAt:  time.Now(),
-			BootArgs:   network.BootArgs(),
+			BootArgs:   network.BootArgs(ip, cfg.BridgeIP, cfg.BridgeMask),
 		}
 
 		// Create VM directory

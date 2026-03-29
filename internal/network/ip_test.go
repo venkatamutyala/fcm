@@ -24,8 +24,8 @@ func TestMACFromIP(t *testing.T) {
 }
 
 func TestBootArgs(t *testing.T) {
-	args := BootArgs()
-	expected := "console=ttyS0 reboot=k panic=1 net.ifnames=0 biosdevname=0"
+	args := BootArgs("192.168.100.10", "192.168.100.1", "255.255.255.0")
+	expected := "console=ttyS0 reboot=k panic=1 net.ifnames=0 biosdevname=0 ip=192.168.100.10::192.168.100.1:255.255.255.0::eth0:off"
 	if args != expected {
 		t.Errorf("BootArgs() = %q, want %q", args, expected)
 	}

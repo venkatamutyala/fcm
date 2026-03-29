@@ -53,10 +53,14 @@ func MACFromIP(ip string) string {
 }
 
 // BootArgs generates the kernel boot arguments.
-// Networking is handled by DHCP (embedded in fcm) + cloud-init, not kernel args.
-// net.ifnames=0 ensures the guest sees "eth0" regardless of distro.
-func BootArgs() string {
-	return "console=ttyS0 reboot=k panic=1 net.ifnames=0 biosdevname=0"
+// The ip= parameter provides immediate networking during early boot (before cloud-init).
+// DHCP and cloud-init provide persistent config, but ip= ensures the interface is up
+// on both first boot and restarts without waiting for cloud-init.
+func BootArgs(ip, gateway, mask string) string {
+	return fmt.Sprintf(
+		"console=ttyS0 reboot=k panic=1 net.ifnames=0 biosdevname=0 ip=%s::%s:%s::eth0:off",
+		ip, gateway, mask,
+	)
 }
 
 // ValidateIP checks that the given IP address is valid for use by a VM:
