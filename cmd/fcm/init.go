@@ -23,11 +23,13 @@ var initYes bool
 
 const (
 	// Firecracker release to download
-	firecrackerVersion = "v1.12.0"
+	firecrackerVersion = "v1.15.0"
 	firecrackerRepo    = "firecracker-microvm/firecracker"
 
-	// Kernel — using Firecracker's CI kernel (known to work)
-	kernelURL = "https://s3.amazonaws.com/spec.ccfc.min/img/quickstart_guide/x86_64/kernels/vmlinux.bin"
+	// Custom kernel with vfat/iso9660 support for cloud-init
+	// Built from Amazon Linux source: kernel/Dockerfile
+	kernelVersion = "kernel-6.1"
+	kernelURL     = "https://github.com/venkatamutyala/fcm/releases/download/kernel-6.1/vmlinux-fcm-x86_64"
 )
 
 var initCmd = &cobra.Command{

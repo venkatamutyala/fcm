@@ -48,21 +48,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sign binaries with cosign (keyless)
+      - name: Sign all release artifacts with cosign (keyless)
         run: |
+          # Sign binaries
           for file in dist/fcm_linux_*/*; do
             if [ -f "$file" ]; then
               echo "Signing $file"
               cosign sign-blob --yes --output-signature "${file}.sig" --output-certificate "${file}.pem" "$file"
             fi
           done
+          # Sign checksums
+          if [ -f dist/checksums.txt ]; then
+            cosign sign-blob --yes --output-signature dist/checksums.txt.sig --output-certificate dist/checksums.txt.pem dist/checksums.txt
+          fi
 
       - name: Upload signatures to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="${GITHUB_REF#refs/tags/}"
-          for file in dist/fcm_linux_*/*.sig dist/fcm_linux_*/*.pem; do
+          for file in dist/fcm_linux_*/*.sig dist/fcm_linux_*/*.pem dist/checksums.txt.sig dist/checksums.txt.pem; do
             if [ -f "$file" ]; then
               gh release upload "$tag" "$file" --clobber
             fi

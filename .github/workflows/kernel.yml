@@ -1,0 +1,55 @@
+name: Build and Release Kernel
+
+on:
+  push:
+    tags:
+      - 'kernel-*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write  # cosign keyless signing
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Build kernel
+        run: |
+          docker build -t fcm-kernel -f kernel/Dockerfile kernel/
+          docker create --name fcm-kernel-extract fcm-kernel
+          docker cp fcm-kernel-extract:/build/linux/vmlinux vmlinux-fcm-x86_64
+          docker rm fcm-kernel-extract
+          ls -lh vmlinux-fcm-x86_64
+
+      - name: Generate checksums
+        run: sha256sum vmlinux-fcm-x86_64 > kernel-checksums.txt
+
+      - name: Sign kernel with cosign
+        run: cosign sign-blob --yes --output-signature vmlinux-fcm-x86_64.sig --output-certificate vmlinux-fcm-x86_64.pem vmlinux-fcm-x86_64
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME:-kernel-6.1}"
+          gh release create "$TAG" \
+            --title "Kernel $TAG" \
+            --notes "Custom Firecracker kernel built from Amazon Linux source with vfat/iso9660 support for cloud-init." \
+            vmlinux-fcm-x86_64 \
+            kernel-checksums.txt \
+            vmlinux-fcm-x86_64.sig \
+            vmlinux-fcm-x86_64.pem \
+            || gh release upload "$TAG" \
+              vmlinux-fcm-x86_64 \
+              kernel-checksums.txt \
+              vmlinux-fcm-x86_64.sig \
+              vmlinux-fcm-x86_64.pem \
+              --clobber
