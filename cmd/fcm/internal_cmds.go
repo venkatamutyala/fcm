@@ -105,7 +105,7 @@ var cleanupVMCmd = &cobra.Command{
 		}
 
 		// Remove TAP device (ignore errors)
-		network.DeleteTAP(v.TAPDevice)
+		_ = network.DeleteTAP(v.TAPDevice)
 
 		// Remove stale socket
 		os.Remove(v.SocketPath)

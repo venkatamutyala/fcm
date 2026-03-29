@@ -160,8 +160,8 @@ func runCreate(cmd *cobra.Command, args []string) error {
 
 	// From here, rollback on failure by removing the VM directory
 	rollback := func() {
-		os.RemoveAll(vm.VMDir(name))
-		systemd.RemoveVMUnit(name)
+		_ = os.RemoveAll(vm.VMDir(name))
+		_ = systemd.RemoveVMUnit(name)
 	}
 
 	// Copy and resize image
@@ -185,7 +185,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create serial log file
-	os.WriteFile(v.SerialLog, nil, 0600)
+	_ = os.WriteFile(v.SerialLog, nil, 0600)
 
 	// Generate systemd unit
 	if err := systemd.WriteVMUnit(v); err != nil {

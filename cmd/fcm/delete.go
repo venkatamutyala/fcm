@@ -40,7 +40,7 @@ var deleteCmd = &cobra.Command{
 		v, err := vm.LoadVM(name)
 		if err == nil {
 			// Clean up TAP device
-			network.DeleteTAP(v.TAPDevice)
+			_ = network.DeleteTAP(v.TAPDevice)
 		}
 
 		// Remove systemd unit

@@ -47,8 +47,8 @@ func MACFromIP(ip string) string {
 		return "AA:FC:00:00:00:01"
 	}
 	var oct3, oct4 int
-	fmt.Sscanf(parts[2], "%d", &oct3)
-	fmt.Sscanf(parts[3], "%d", &oct4)
+	_, _ = fmt.Sscanf(parts[2], "%d", &oct3)
+	_, _ = fmt.Sscanf(parts[3], "%d", &oct4)
 	return fmt.Sprintf("AA:FC:00:00:%02X:%02X", oct3, oct4)
 }
 

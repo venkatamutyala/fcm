@@ -18,12 +18,12 @@ func CreateTAP(tapName, bridgeName string) error {
 	}
 
 	if err := run("ip", "link", "set", tapName, "up"); err != nil {
-		DeleteTAP(tapName) // cleanup on failure
+		_ = DeleteTAP(tapName) // cleanup on failure
 		return fmt.Errorf("bring up tap: %w", err)
 	}
 
 	if err := run("ip", "link", "set", tapName, "master", bridgeName); err != nil {
-		DeleteTAP(tapName) // cleanup on failure
+		_ = DeleteTAP(tapName) // cleanup on failure
 		return fmt.Errorf("attach tap to bridge: %w", err)
 	}
 
