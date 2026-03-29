@@ -1,7 +1,6 @@
 bin/
 *.exe
-bin/
 *.ext4
 /var/
 .claude/
-fcm
+/fcm
