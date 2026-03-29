@@ -55,6 +55,10 @@ jobs:
           - alma-9
           - centos-stream9
           - opensuse-15.6
+          # TODO: Enable after fixes
+          # - fedora-41      # Fix: download URL 404
+          # - arch           # Fix: needs BTRFS kernel module
+          # - alpine-3.20   # Fix: no partition table, uses tiny-cloud
     steps:
       - name: Enable KVM
         run: |
