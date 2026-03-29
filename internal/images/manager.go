@@ -264,10 +264,25 @@ func patchRootfsForFirecracker(ext4Path string) error {
 		os.Remove(filepath.Join(mountDir, "usr", "lib", "systemd", "system-generators", "sshd-socket-generator"))
 		_ = os.Symlink("/dev/null", filepath.Join(systemdDir, "ssh.socket"))
 
-		// Start sshd via cron @reboot (works across all distros with cron)
-		cronDir := filepath.Join(mountDir, "etc", "cron.d")
-		_ = os.MkdirAll(cronDir, 0755)
-		_ = os.WriteFile(filepath.Join(cronDir, "fcm-sshd"), []byte("@reboot root mkdir -p /run/sshd && /usr/sbin/sshd\n"), 0644)
+		// Enable sshd via a custom systemd service (more reliable than cron @reboot)
+		fcmSSHD := `[Unit]
+Description=FCM SSH Server
+After=basic.target
+
+[Service]
+Type=simple
+ExecStartPre=/bin/mkdir -p /run/sshd
+ExecStart=/usr/sbin/sshd -D
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+`
+		_ = os.WriteFile(filepath.Join(systemdDir, "fcm-sshd.service"), []byte(fcmSSHD), 0644)
+		multiUserWants := filepath.Join(systemdDir, "multi-user.target.wants")
+		_ = os.MkdirAll(multiUserWants, 0755)
+		_ = os.Symlink("/etc/systemd/system/fcm-sshd.service", filepath.Join(multiUserWants, "fcm-sshd.service"))
 	}
 
 	// Fix fstab: we extracted just the root partition from a full disk image.
