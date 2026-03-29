@@ -1,0 +1,15 @@
+name: Protect Tags
+
+on:
+  delete:
+    tags:
+      - 'v*'
+
+jobs:
+  prevent-tag-deletion:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail on tag deletion
+        run: |
+          echo "::error::Tag deletion is not allowed. Tags are immutable for supply chain security."
+          exit 1
