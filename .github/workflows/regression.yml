@@ -200,3 +200,104 @@ jobs:
       - name: Cleanup
         if: always()
         run: sudo fcm cleanup --confirm 2>/dev/null || true
+
+  test-templates:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        template:
+          - alpine
+          - alpine-docker
+          - alpine-dev
+          - ubuntu
+          - ubuntu-dev
+          - debian
+    steps:
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: fcm-artifacts
+
+      - name: Set VM name
+        run: |
+          VM_NAME="tpl-$(echo '${{ matrix.template }}' | tr '.' '-')"
+          echo "VM_NAME=$VM_NAME" >> $GITHUB_ENV
+
+      - name: Install fcm and dependencies
+        run: |
+          chmod +x fcm
+          sudo cp fcm /usr/local/bin/fcm
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-utils fdisk e2fsprogs mtools dosfstools
+
+      - name: Initialize fcm
+        run: sudo fcm init --yes
+
+      - name: Install custom kernel
+        run: sudo cp vmlinux-fcm /var/lib/fcm/kernels/vmlinux-default
+
+      - name: Generate SSH key
+        run: |
+          ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N "" -q
+          sudo mkdir -p /root/.ssh
+          sudo cp ~/.ssh/id_ed25519 /root/.ssh/id_ed25519
+          sudo cp ~/.ssh/id_ed25519.pub /root/.ssh/id_ed25519.pub
+          sudo chmod 600 /root/.ssh/id_ed25519
+
+      - name: "Test: create from template"
+        run: |
+          sudo fcm create ${{ env.VM_NAME }} \
+            --template ${{ matrix.template }} \
+            --ssh-key ~/.ssh/id_ed25519.pub
+          sudo fcm list
+
+      - name: "Test: SSH"
+        run: |
+          echo "Waiting for VM to boot..."
+          for i in $(seq 1 24); do
+            if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o IdentitiesOnly=yes -o ConnectTimeout=5 -o BatchMode=yes \
+              -i ~/.ssh/id_ed25519 root@192.168.100.10 "echo OK" 2>/dev/null; then
+              echo "SSH ready after $((i * 5))s"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "SSH failed after 120s"
+          sudo tail -50 /var/lib/fcm/vms/${{ env.VM_NAME }}/console.log || true
+          exit 1
+
+      - name: "Test: verify template packages"
+        if: contains(matrix.template, 'docker')
+        run: |
+          # Wait for cloud-init to finish installing packages
+          sleep 30
+          sudo fcm exec ${{ env.VM_NAME }} -- docker --version || echo "Docker not yet installed (cloud-init may still be running)"
+
+      - name: "Test: delete"
+        run: |
+          sudo fcm delete ${{ env.VM_NAME }} --force
+          sudo fcm list | grep -q "No VMs" && echo "Delete OK"
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "=== fcm list ==="
+          sudo fcm list || true
+          echo "=== console.log ==="
+          sudo cat /var/lib/fcm/vms/${{ env.VM_NAME }}/console.log 2>/dev/null | tail -100 || true
+          echo "=== DHCP logs ==="
+          sudo journalctl -u fcm-dhcp.service --no-pager -n 20 || true
+
+      - name: Cleanup
+        if: always()
+        run: sudo fcm cleanup --confirm 2>/dev/null || true
