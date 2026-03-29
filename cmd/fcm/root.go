@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	fcmerrors "fcm.dev/fcm-cli/internal/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -43,7 +44,7 @@ func init() {
 // requireRoot checks that the process is running as root.
 func requireRoot() error {
 	if os.Geteuid() != 0 {
-		return fmt.Errorf("fcm must be run as root")
+		return fcmerrors.WithPermissionHint(fmt.Errorf("fcm must be run as root"))
 	}
 	return nil
 }

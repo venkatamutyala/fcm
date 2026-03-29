@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,13 +9,17 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"fcm.dev/fcm-cli/internal/config"
 	"fcm.dev/fcm-cli/internal/network"
+	"fcm.dev/fcm-cli/internal/progress"
 	"fcm.dev/fcm-cli/internal/systemd"
 	"github.com/spf13/cobra"
 )
+
+var initYes bool
 
 const (
 	// Firecracker release to download
@@ -32,11 +37,17 @@ var initCmd = &cobra.Command{
 }
 
 func init() {
+	initCmd.Flags().BoolVar(&initYes, "yes", false, "Auto-install missing dependencies without prompting")
 	rootCmd.AddCommand(initCmd)
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
 	if err := requireRoot(); err != nil {
+		return err
+	}
+
+	// Pre-check: ensure required binaries are available
+	if err := checkAndInstallDeps(); err != nil {
 		return err
 	}
 
@@ -221,12 +232,125 @@ func downloadToFile(url, destPath string) error {
 	}
 	defer f.Close()
 
-	written, err := io.Copy(f, resp.Body)
+	pr := progress.NewReader(resp.Body, resp.ContentLength)
+	_, err = io.Copy(f, pr)
+	pr.Finish()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("    Downloaded %d MB\n", written/1024/1024)
 	return nil
+}
+
+// checkAndInstallDeps checks for required binaries and offers to install them.
+func checkAndInstallDeps() error {
+	// Binary -> package mapping per package manager
+	type depInfo struct {
+		binary  string
+		aptPkg  string
+		dnfPkg  string
+		zyPkg   string
+	}
+
+	deps := []depInfo{
+		{"qemu-img", "qemu-utils", "qemu-img", "qemu-tools"},
+		{"sfdisk", "fdisk", "util-linux", "util-linux"},
+		{"mkfs.vfat", "dosfstools", "dosfstools", "dosfstools"},
+		{"mcopy", "mtools", "mtools", "mtools"},
+		{"e2fsck", "e2fsprogs", "e2fsprogs", "e2fsprogs"},
+	}
+
+	var missing []depInfo
+	for _, d := range deps {
+		if _, err := exec.LookPath(d.binary); err != nil {
+			missing = append(missing, d)
+		}
+	}
+
+	if len(missing) == 0 {
+		return nil
+	}
+
+	// Detect package manager
+	pkgMgr, pkgArgs := detectPackageManager()
+	if pkgMgr == "" {
+		var names []string
+		for _, d := range missing {
+			names = append(names, d.binary)
+		}
+		return fmt.Errorf("missing required tools: %s (could not detect package manager to install them)",
+			strings.Join(names, ", "))
+	}
+
+	// Build package list
+	var pkgs []string
+	seen := make(map[string]bool)
+	for _, d := range missing {
+		var pkg string
+		switch pkgMgr {
+		case "apt-get":
+			pkg = d.aptPkg
+		case "dnf":
+			pkg = d.dnfPkg
+		case "zypper":
+			pkg = d.zyPkg
+		}
+		if !seen[pkg] {
+			pkgs = append(pkgs, pkg)
+			seen[pkg] = true
+		}
+	}
+
+	var binNames []string
+	for _, d := range missing {
+		binNames = append(binNames, d.binary)
+	}
+
+	installCmd := fmt.Sprintf("%s %s %s", pkgMgr, strings.Join(pkgArgs, " "), strings.Join(pkgs, " "))
+
+	fmt.Printf("Missing required tools: %s\n", strings.Join(binNames, ", "))
+	fmt.Printf("Install command: %s\n", installCmd)
+
+	if !initYes {
+		fmt.Print("Install now? [y/N] ")
+		reader := bufio.NewReader(os.Stdin)
+		answer, _ := reader.ReadString('\n')
+		answer = strings.TrimSpace(strings.ToLower(answer))
+		if answer != "y" && answer != "yes" {
+			return fmt.Errorf("missing dependencies — install them and re-run 'fcm init'")
+		}
+	}
+
+	fmt.Println("Installing dependencies...")
+	args := append(pkgArgs, pkgs...)
+	cmd := exec.Command(pkgMgr, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("install failed: %w", err)
+	}
+
+	// Verify all binaries are now available
+	for _, d := range missing {
+		if _, err := exec.LookPath(d.binary); err != nil {
+			return fmt.Errorf("binary %q still not found after install", d.binary)
+		}
+	}
+
+	fmt.Println("Dependencies installed successfully")
+	return nil
+}
+
+func detectPackageManager() (string, []string) {
+	if _, err := exec.LookPath("apt-get"); err == nil {
+		return "apt-get", []string{"install", "-y"}
+	}
+	if _, err := exec.LookPath("dnf"); err == nil {
+		return "dnf", []string{"install", "-y"}
+	}
+	if _, err := exec.LookPath("zypper"); err == nil {
+		return "zypper", []string{"install", "-y"}
+	}
+	return "", nil
 }
 
 func copyFilePath(src, dst string) error {

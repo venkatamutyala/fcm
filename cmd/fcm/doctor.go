@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"fcm.dev/fcm-cli/internal/config"
+	fcmerrors "fcm.dev/fcm-cli/internal/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -64,7 +65,7 @@ func checkRoot() error {
 func checkKVM() error {
 	info, err := os.Stat("/dev/kvm")
 	if err != nil {
-		return fmt.Errorf("/dev/kvm not found (is KVM enabled?)")
+		return fcmerrors.WithKVMHint(fmt.Errorf("/dev/kvm not found"))
 	}
 	// Check it's a character device
 	if info.Mode()&os.ModeCharDevice == 0 {

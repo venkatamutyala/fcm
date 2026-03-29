@@ -10,6 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	fcmerrors "fcm.dev/fcm-cli/internal/errors"
+	"fcm.dev/fcm-cli/internal/progress"
 )
 
 const (
@@ -290,8 +293,8 @@ func checkPullDeps() error {
 		}
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("missing required tools: %s\nInstall with: sudo apt-get install qemu-utils fdisk e2fsprogs",
-			strings.Join(missing, ", "))
+		return fcmerrors.WithQemuImgHint(
+			fmt.Errorf("missing required tools: %s", strings.Join(missing, ", ")))
 	}
 	return nil
 }
@@ -399,7 +402,67 @@ func resolveImageURL(name string) (string, error) {
 		return url, nil
 	}
 
-	return "", fmt.Errorf("unknown image %q (available: %s)", name, strings.Join(availableImages(), ", "))
+	return "", fcmerrors.WithImageHint(fmt.Errorf("unknown image %q", name))
+}
+
+// AvailableImages returns all pullable image names.
+func AvailableImages() []string {
+	return availableImages()
+}
+
+// ImageFamilies returns image names grouped by distro family for display.
+func ImageFamilies() []ImageFamily {
+	return []ImageFamily{
+		{Family: "Ubuntu", Images: []ImageInfo{
+			{Name: "ubuntu", Format: "qcow2"},
+			{Name: "ubuntu-24.04", Format: "qcow2"},
+			{Name: "ubuntu-22.04", Format: "qcow2"},
+		}},
+		{Family: "Debian", Images: []ImageInfo{
+			{Name: "debian", Format: "qcow2"},
+			{Name: "debian-12", Format: "qcow2"},
+		}},
+		{Family: "Fedora", Images: []ImageInfo{
+			{Name: "fedora", Format: "qcow2"},
+			{Name: "fedora-41", Format: "qcow2"},
+		}},
+		{Family: "RHEL", Images: []ImageInfo{
+			{Name: "rocky", Format: "qcow2"},
+			{Name: "rocky-9", Format: "qcow2"},
+			{Name: "alma", Format: "qcow2"},
+			{Name: "alma-9", Format: "qcow2"},
+			{Name: "centos", Format: "qcow2"},
+			{Name: "centos-stream9", Format: "qcow2"},
+		}},
+		{Family: "Alpine", Images: []ImageInfo{
+			{Name: "alpine", Format: "qcow2"},
+			{Name: "alpine-3.20", Format: "qcow2"},
+		}},
+		{Family: "Arch", Images: []ImageInfo{
+			{Name: "arch", Format: "qcow2"},
+		}},
+		{Family: "openSUSE", Images: []ImageInfo{
+			{Name: "opensuse", Format: "qcow2"},
+			{Name: "opensuse-15.6", Format: "qcow2"},
+		}},
+	}
+}
+
+// ImageFamily groups images by distro family.
+type ImageFamily struct {
+	Family string
+	Images []ImageInfo
+}
+
+// ImageInfo describes a pullable image.
+type ImageInfo struct {
+	Name   string
+	Format string
+}
+
+// DetectFS reads the first bytes of a file to determine the filesystem type (exported).
+func DetectFS(path string) string {
+	return detectFS(path)
 }
 
 func availableImages() []string {
@@ -434,12 +497,13 @@ func downloadFile(url, destPath string) error {
 	}
 	defer f.Close()
 
-	written, err := io.Copy(f, resp.Body)
+	pr := progress.NewReader(resp.Body, resp.ContentLength)
+	_, err = io.Copy(f, pr)
+	pr.Finish()
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Downloaded %d MB\n", written/1024/1024)
 	return nil
 }
 

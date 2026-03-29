@@ -10,10 +10,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var imagesAvailable bool
+
 var imagesCmd = &cobra.Command{
 	Use:   "images",
 	Short: "List available images",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if imagesAvailable {
+			return listAvailableImages()
+		}
+
 		imgs, err := images.List()
 		if err != nil {
 			return err
@@ -21,6 +27,7 @@ var imagesCmd = &cobra.Command{
 
 		if len(imgs) == 0 {
 			fmt.Println("No images found. Pull one with: fcm pull ubuntu-22.04")
+			fmt.Println("See all pullable images with: fcm images --available")
 			return nil
 		}
 
@@ -38,6 +45,26 @@ var imagesCmd = &cobra.Command{
 		w.Flush()
 		return nil
 	},
+}
+
+func listAvailableImages() error {
+	families := images.ImageFamilies()
+
+	if flagJSON {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(families)
+	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+	fmt.Fprintf(w, "NAME\tFAMILY\tFORMAT\n")
+	for _, fam := range families {
+		for _, img := range fam.Images {
+			fmt.Fprintf(w, "%s\t%s\t%s\n", img.Name, fam.Family, img.Format)
+		}
+	}
+	w.Flush()
+	return nil
 }
 
 var pullCmd = &cobra.Command{
@@ -85,6 +112,7 @@ var rmiCmd = &cobra.Command{
 }
 
 func init() {
+	imagesCmd.Flags().BoolVar(&imagesAvailable, "available", false, "List all pullable images")
 	rootCmd.AddCommand(imagesCmd)
 	rootCmd.AddCommand(pullCmd)
 	rootCmd.AddCommand(importCmd)

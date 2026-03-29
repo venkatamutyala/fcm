@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
 
 	"fcm.dev/fcm-cli/internal/cloudinit"
 	"fcm.dev/fcm-cli/internal/config"
+	fcmerrors "fcm.dev/fcm-cli/internal/errors"
 	"fcm.dev/fcm-cli/internal/images"
 	"fcm.dev/fcm-cli/internal/network"
 	"fcm.dev/fcm-cli/internal/systemd"
@@ -63,7 +65,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 
 	// Check that fcm init has been run
 	if !network.BridgeExists(cfg.BridgeName) {
-		return fmt.Errorf("network bridge %s not found — run 'fcm init' first", cfg.BridgeName)
+		return fcmerrors.WithBridgeHint(fmt.Errorf("network bridge %s not found", cfg.BridgeName))
 	}
 
 	// Apply defaults
@@ -91,10 +93,14 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--disk must be at least 1 GB")
 	}
 
-	// Read SSH key if provided
+	// Read SSH key — auto-detect if not provided
+	sshKeyPath := createFlags.sshKey
+	if sshKeyPath == "" {
+		sshKeyPath = autoDetectSSHKey()
+	}
 	var sshPubKey string
-	if createFlags.sshKey != "" {
-		data, err := os.ReadFile(createFlags.sshKey)
+	if sshKeyPath != "" {
+		data, err := os.ReadFile(sshKeyPath)
 		if err != nil {
 			return fmt.Errorf("read ssh key: %w", err)
 		}
@@ -201,10 +207,14 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Starting %s...\n", name)
+	bootStart := time.Now()
 	if err := systemd.Start(unit); err != nil {
 		rollback()
 		return fmt.Errorf("start vm: %w", err)
 	}
+
+	// Wait for SSH readiness
+	waitForSSH(v.IP, bootStart)
 
 	fmt.Printf("\nVM %s created and started:\n", name)
 	fmt.Printf("  IP:     %s\n", v.IP)
@@ -216,4 +226,53 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  SSH:     ssh root@%s\n", v.IP)
 	fmt.Printf("  Console: fcm console %s\n", name)
 	return nil
+}
+
+// autoDetectSSHKey checks common SSH public key paths and returns the first
+// one found. Returns empty string if none found.
+func autoDetectSSHKey() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	candidates := []string{
+		filepath.Join(home, ".ssh", "id_ed25519.pub"),
+		filepath.Join(home, ".ssh", "id_rsa.pub"),
+		filepath.Join(home, ".ssh", "id_ecdsa.pub"),
+	}
+	for _, p := range candidates {
+		if _, err := os.Stat(p); err == nil {
+			fmt.Printf("Using SSH key: %s\n", p)
+			return p
+		}
+	}
+	fmt.Println("Warning: No SSH key found. VM accessible via console only (password: fcm)")
+	return ""
+}
+
+// waitForSSH polls TCP port 22 on the VM's IP until it becomes reachable or
+// the timeout (120s) expires.
+func waitForSSH(ip string, bootStart time.Time) {
+	timeout := 120 * time.Second
+	poll := 2 * time.Second
+	deadline := time.Now().Add(timeout)
+	spinChars := []rune{'|', '/', '-', '\\'}
+	i := 0
+
+	for time.Now().Before(deadline) {
+		elapsed := time.Since(bootStart).Truncate(time.Second)
+		fmt.Printf("\r%c Waiting for VM to boot... (%s)", spinChars[i%len(spinChars)], elapsed)
+		i++
+
+		conn, err := net.DialTimeout("tcp", net.JoinHostPort(ip, "22"), poll)
+		if err == nil {
+			conn.Close()
+			elapsed = time.Since(bootStart)
+			fmt.Printf("\rVM ready! (booted in %.1fs)          \n", elapsed.Seconds())
+			return
+		}
+		time.Sleep(poll)
+	}
+
+	fmt.Printf("\rVM started but SSH not yet reachable          \n")
 }

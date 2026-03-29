@@ -153,6 +153,11 @@ func WriteDHCPUnit() error {
 	return DaemonReload()
 }
 
+// Disable disables a systemd unit.
+func Disable(unit string) error {
+	return runSystemctl("disable", unit)
+}
+
 // Enable enables a systemd unit.
 func Enable(unit string) error {
 	return runSystemctl("enable", unit)

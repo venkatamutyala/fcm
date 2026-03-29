@@ -113,6 +113,12 @@ func ensureNAT(cfg *config.Config) error {
 	return nil
 }
 
+// CleanupNAT removes all NAT and forwarding rules for the FCM bridge.
+func CleanupNAT(cfg *config.Config) {
+	removeNAT(cfg)
+	removeForwardRules(cfg)
+}
+
 func removeNAT(cfg *config.Config) {
 	_ = exec.Command("iptables", "-t", "nat", "-D", "POSTROUTING",
 		"-s", cfg.BridgeSubnet, "!", "-o", cfg.BridgeName,
