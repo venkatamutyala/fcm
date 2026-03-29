@@ -17,7 +17,7 @@ permissions:
 jobs:
   setup:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -34,11 +34,21 @@ jobs:
       - name: Build fcm
         run: go build -ldflags "-s -w -X main.Version=test" -o fcm ./cmd/fcm
 
-      - name: Upload fcm binary
+      - name: Build custom kernel
+        run: |
+          docker build -t fcm-kernel -f kernel/Dockerfile kernel/
+          docker create --name fcm-kernel-extract fcm-kernel
+          docker cp fcm-kernel-extract:/build/linux/vmlinux vmlinux-fcm
+          docker rm fcm-kernel-extract
+          ls -lh vmlinux-fcm
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: fcm-binary
-          path: fcm
+          name: fcm-artifacts
+          path: |
+            fcm
+            vmlinux-fcm
 
   test:
     needs: setup
@@ -67,10 +77,10 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           ls -la /dev/kvm
 
-      - name: Download fcm binary
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: fcm-binary
+          name: fcm-artifacts
 
       - name: Set VM name
         run: |
@@ -88,6 +98,11 @@ jobs:
 
       - name: Initialize fcm
         run: sudo fcm init --yes
+
+      - name: Install custom kernel
+        run: |
+          sudo cp vmlinux-fcm /var/lib/fcm/kernels/vmlinux-default
+          echo "Custom kernel installed (with vfat/iso9660 support)"
 
       - name: Verify system
         run: sudo fcm doctor
