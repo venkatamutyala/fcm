@@ -227,12 +227,45 @@ func patchRootfsForFirecracker(ext4Path string) error {
 	}
 	defer func() { _ = exec.Command("umount", mountDir).Run() }()
 
-	// Enable PermitRootLogin — must be in image, not cloud-init runcmd,
+	// SSH configuration — must be in image, not cloud-init runcmd,
 	// because sshd starts before runcmd executes.
 	if _, err := os.Stat(filepath.Join(mountDir, "etc", "ssh")); err == nil {
 		sshdConfDir := filepath.Join(mountDir, "etc", "ssh", "sshd_config.d")
 		_ = os.MkdirAll(sshdConfDir, 0755)
 		_ = os.WriteFile(filepath.Join(sshdConfDir, "99-fcm.conf"), []byte("PermitRootLogin yes\nPasswordAuthentication yes\n"), 0644)
+
+		// Pre-generate SSH host keys so sshd can start without cloud-init on restarts
+		sshEtcDir := filepath.Join(mountDir, "etc", "ssh")
+		for _, kt := range []struct{ name, typ string }{
+			{"ssh_host_rsa_key", "rsa"},
+			{"ssh_host_ecdsa_key", "ecdsa"},
+			{"ssh_host_ed25519_key", "ed25519"},
+		} {
+			keyPath := filepath.Join(sshEtcDir, kt.name)
+			if _, err := os.Stat(keyPath); os.IsNotExist(err) {
+				_ = exec.Command("ssh-keygen", "-t", kt.typ, "-f", keyPath, "-N", "", "-q").Run()
+			}
+		}
+
+		// Fix SSH for VM restarts: Ubuntu 24.04's ssh.socket doesn't reliably
+		// accept connections after Firecracker VM power cycles. Disable ssh.socket,
+		// remove its generator, and start sshd via cron @reboot instead.
+		systemdDir := filepath.Join(mountDir, "etc", "systemd", "system")
+		_ = os.MkdirAll(systemdDir, 0755)
+
+		// Mask ssh.socket
+		socketsWants := filepath.Join(systemdDir, "sockets.target.wants")
+		os.Remove(filepath.Join(socketsWants, "ssh.socket"))
+		svcRequires := filepath.Join(systemdDir, "ssh.service.requires")
+		os.Remove(filepath.Join(svcRequires, "ssh.socket"))
+		os.RemoveAll(svcRequires)
+		os.Remove(filepath.Join(mountDir, "usr", "lib", "systemd", "system-generators", "sshd-socket-generator"))
+		_ = os.Symlink("/dev/null", filepath.Join(systemdDir, "ssh.socket"))
+
+		// Start sshd via cron @reboot (works across all distros with cron)
+		cronDir := filepath.Join(mountDir, "etc", "cron.d")
+		_ = os.MkdirAll(cronDir, 0755)
+		_ = os.WriteFile(filepath.Join(cronDir, "fcm-sshd"), []byte("@reboot root mkdir -p /run/sshd && /usr/sbin/sshd\n"), 0644)
 	}
 
 	// Fix fstab: we extracted just the root partition from a full disk image.
