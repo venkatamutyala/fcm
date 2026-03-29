@@ -1,0 +1,12 @@
+#cloud-config
+# FCM cloud-init template: Tailscale
+# Copy this file and edit the authkey before using:
+#   cp env/tailscale.yaml my-cloud-init.yaml
+#   fcm create my-vm --image ubuntu-22.04 --cloud-init my-cloud-init.yaml
+
+packages:
+  - curl
+
+runcmd:
+  - curl -fsSL https://tailscale.com/install.sh | sh
+  - tailscale up --authkey=CHANGE_ME --ssh

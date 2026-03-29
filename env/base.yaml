@@ -1,0 +1,10 @@
+#cloud-config
+# FCM cloud-init template: Base
+# This is the minimal template. SSH key and hostname are injected by FCM automatically.
+# Add your own packages and commands below.
+
+package_update: true
+
+packages: []
+
+runcmd: []

@@ -1,0 +1,87 @@
+package main
+
+import (
+	"fmt"
+	"time"
+
+	"fcm.dev/fcm-cli/internal/firecracker"
+	"fcm.dev/fcm-cli/internal/vm"
+	"github.com/spf13/cobra"
+)
+
+var configureVMCmd = &cobra.Command{
+	Use:    "_configure-vm [name]",
+	Short:  "Configure and boot a VM via Firecracker API (internal)",
+	Hidden: true,
+	Args:   cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		name := args[0]
+		v, err := vm.LoadVM(name)
+		if err != nil {
+			return err
+		}
+
+		// Wait for Firecracker socket to be ready
+		if err := firecracker.WaitForSocket(v.SocketPath, 5*time.Second); err != nil {
+			return err
+		}
+
+		fc := firecracker.NewClient(v.SocketPath)
+
+		// Configure in the required order: machine-config, boot-source, drives, network, then start
+		fmt.Printf("Configuring %s...\n", name)
+
+		if err := fc.PutMachineConfig(firecracker.MachineConfig{
+			VCPUCount:  v.CPUs,
+			MemSizeMiB: v.MemoryMB,
+		}); err != nil {
+			return fmt.Errorf("set machine config: %w", err)
+		}
+
+		if err := fc.PutBootSource(firecracker.BootSource{
+			KernelImagePath: v.Kernel,
+			BootArgs:        v.BootArgs,
+		}); err != nil {
+			return fmt.Errorf("set boot source: %w", err)
+		}
+
+		if err := fc.PutDrive("rootfs", firecracker.Drive{
+			DriveID:      "rootfs",
+			PathOnHost:   v.RootfsPath,
+			IsRootDevice: true,
+			IsReadOnly:   false,
+		}); err != nil {
+			return fmt.Errorf("set rootfs drive: %w", err)
+		}
+
+		if v.CIDataPath != "" {
+			if err := fc.PutDrive("cidata", firecracker.Drive{
+				DriveID:      "cidata",
+				PathOnHost:   v.CIDataPath,
+				IsRootDevice: false,
+				IsReadOnly:   true,
+			}); err != nil {
+				return fmt.Errorf("set cidata drive: %w", err)
+			}
+		}
+
+		if err := fc.PutNetworkInterface("eth0", firecracker.NetworkInterface{
+			IfaceID:     "eth0",
+			GuestMAC:    v.MAC,
+			HostDevName: v.TAPDevice,
+		}); err != nil {
+			return fmt.Errorf("set network interface: %w", err)
+		}
+
+		if err := fc.StartInstance(); err != nil {
+			return fmt.Errorf("start instance: %w", err)
+		}
+
+		fmt.Printf("VM %s booting\n", name)
+		return nil
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(configureVMCmd)
+}
