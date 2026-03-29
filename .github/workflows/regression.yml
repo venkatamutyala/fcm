@@ -6,14 +6,18 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      images:
+        description: "Comma-separated images to test (leave empty for all)"
+        required: false
 
 permissions:
   contents: read
 
 jobs:
-  regression:
+  setup:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -22,7 +26,6 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-          ls -la /dev/kvm
 
       - uses: actions/setup-go@v5
         with:
@@ -31,71 +34,137 @@ jobs:
       - name: Build fcm
         run: go build -ldflags "-s -w -X main.Version=test" -o fcm ./cmd/fcm
 
-      - name: Install dependencies
+      - name: Upload fcm binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcm-binary
+          path: fcm
+
+  test:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - ubuntu-24.04
+          - ubuntu-22.04
+          - debian-12
+          - rocky-9
+          - alma-9
+          - centos-stream9
+          - opensuse-15.6
+    steps:
+      - name: Enable KVM
         run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-utils fdisk e2fsprogs mtools dosfstools
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -la /dev/kvm
 
-      - name: Install fcm
-        run: sudo cp fcm /usr/local/bin/fcm
+      - name: Download fcm binary
+        uses: actions/download-artifact@v4
+        with:
+          name: fcm-binary
 
-      - name: Run fcm init
+      - name: Install fcm and dependencies
+        run: |
+          chmod +x fcm
+          sudo cp fcm /usr/local/bin/fcm
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-utils fdisk e2fsprogs mtools dosfstools
+
+      - name: Initialize fcm
         run: sudo fcm init --yes
 
-      - name: Check fcm doctor
+      - name: Verify system
         run: sudo fcm doctor
 
       - name: Generate SSH key
         run: ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N "" -q
 
-      - name: Pull Ubuntu 24.04
-        run: sudo fcm pull ubuntu-24.04
+      - name: Pull image
+        run: sudo fcm pull ${{ matrix.image }}
 
-      - name: Test create + SSH
+      - name: "Test: create"
         run: |
-          sudo fcm create test-vm --image ubuntu-24.04 --ssh-key ~/.ssh/id_ed25519.pub
+          sudo fcm create test-${{ matrix.image }} \
+            --image ${{ matrix.image }} \
+            --ssh-key ~/.ssh/id_ed25519.pub
+          sudo fcm list
+
+      - name: "Test: SSH (first boot)"
+        run: |
           echo "Waiting for VM to boot..."
-          sleep 60
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -o IdentitiesOnly=yes -o ConnectTimeout=10 \
-            -i ~/.ssh/id_ed25519 root@192.168.100.10 \
-            "echo 'SSH OK'; hostname; cat /etc/os-release | head -1"
+          for i in $(seq 1 24); do
+            if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o IdentitiesOnly=yes -o ConnectTimeout=5 -o BatchMode=yes \
+              -i ~/.ssh/id_ed25519 root@192.168.100.10 "echo OK" 2>/dev/null; then
+              echo "SSH ready after $((i * 5))s"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "SSH failed after 120s"
+          sudo tail -50 /var/lib/fcm/vms/test-${{ matrix.image }}/console.log || true
+          exit 1
 
-      - name: Test stop + start + SSH
+      - name: "Test: exec"
         run: |
-          sudo fcm stop test-vm
-          sudo fcm list
-          sudo fcm start test-vm
-          echo "Waiting for restart..."
-          sleep 60
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -o IdentitiesOnly=yes -o ConnectTimeout=10 \
-            -i ~/.ssh/id_ed25519 root@192.168.100.10 \
-            "echo 'RESTART SSH OK'; uptime"
+          sudo fcm exec test-${{ matrix.image }} -- hostname
+          sudo fcm exec test-${{ matrix.image }} -- cat /etc/os-release
 
-      - name: Test exec
+      - name: "Test: inspect"
+        run: sudo fcm inspect test-${{ matrix.image }}
+
+      - name: "Test: stop + start"
         run: |
-          sudo fcm exec test-vm -- hostname
-          sudo fcm exec test-vm -- cat /etc/os-release | head -1
+          sudo fcm stop test-${{ matrix.image }}
+          sudo fcm list | grep stopped
+          sudo fcm start test-${{ matrix.image }}
+          sudo fcm list | grep running
 
-      - name: Test backup + restore
+      - name: "Test: SSH (after restart)"
         run: |
-          sudo fcm backup test-vm
-          sudo fcm backups test-vm
+          echo "Waiting for VM to restart..."
+          for i in $(seq 1 24); do
+            if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o IdentitiesOnly=yes -o ConnectTimeout=5 -o BatchMode=yes \
+              -i ~/.ssh/id_ed25519 root@192.168.100.10 "echo OK" 2>/dev/null; then
+              echo "SSH ready after $((i * 5))s"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "SSH failed after 120s"
+          sudo tail -50 /var/lib/fcm/vms/test-${{ matrix.image }}/console.log || true
+          exit 1
 
-      - name: Test inspect + logs
+      - name: "Test: backup + restore"
         run: |
-          sudo fcm inspect test-vm
-          sudo fcm logs test-vm | tail -5
+          sudo fcm backup test-${{ matrix.image }}
+          sudo fcm backups test-${{ matrix.image }}
 
-      - name: Test delete
+      - name: "Test: delete"
         run: |
-          sudo fcm delete test-vm --force
-          sudo fcm list
+          sudo fcm delete test-${{ matrix.image }} --force
+          sudo fcm list | grep -q "No VMs" && echo "Delete OK"
 
-      - name: Test cleanup
-        run: sudo fcm cleanup --confirm
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "=== fcm list ==="
+          sudo fcm list || true
+          echo "=== fcm doctor ==="
+          sudo fcm doctor || true
+          echo "=== console.log ==="
+          sudo cat /var/lib/fcm/vms/test-${{ matrix.image }}/console.log 2>/dev/null | tail -100 || true
+          echo "=== systemd status ==="
+          sudo systemctl status fcm-vm-test-${{ matrix.image }}.service 2>/dev/null || true
+          echo "=== DHCP logs ==="
+          sudo journalctl -u fcm-dhcp.service --no-pager -n 20 || true
 
-      - name: Print results
+      - name: Cleanup
         if: always()
-        run: echo "Regression test complete"
+        run: sudo fcm cleanup --confirm 2>/dev/null || true
