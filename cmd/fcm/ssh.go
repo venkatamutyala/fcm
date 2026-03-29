@@ -32,20 +32,10 @@ func runSSH(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("vm %q has no IP address", name)
 	}
 
-	// Exec into ssh, replacing the current process
 	sshPath, err := exec.LookPath("ssh")
 	if err != nil {
 		return fmt.Errorf("ssh not found: %w", err)
 	}
 
-	sshArgs := []string{
-		"ssh",
-		"-o", "StrictHostKeyChecking=no",
-		"-o", "UserKnownHostsFile=/dev/null",
-		"-o", "LogLevel=ERROR",
-		fmt.Sprintf("root@%s", v.IP),
-	}
-
-	// Replace process with ssh
-	return syscall.Exec(sshPath, sshArgs, os.Environ())
+	return syscall.Exec(sshPath, sshBaseArgs(v.IP), os.Environ())
 }

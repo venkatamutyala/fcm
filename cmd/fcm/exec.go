@@ -34,8 +34,6 @@ func runExec(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("vm %q has no IP address", name)
 	}
 
-	// Everything after the first arg is the remote command.
-	// Cobra strips the "--" but passes the rest in args.
 	remoteArgs := args[1:]
 	if len(remoteArgs) == 0 {
 		return fmt.Errorf("no command specified (use: fcm exec %s -- <command>)", name)
@@ -46,20 +44,8 @@ func runExec(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("ssh not found: %w", err)
 	}
 
-	sshArgs := []string{
-		"ssh",
-		"-o", "StrictHostKeyChecking=no",
-		"-o", "UserKnownHostsFile=/dev/null",
-		"-o", "LogLevel=ERROR",
-		fmt.Sprintf("root@%s", v.IP),
-		strings.Join(remoteArgs, " "),
-	}
+	sshArgs := sshBaseArgs(v.IP)
+	sshArgs = append(sshArgs, strings.Join(remoteArgs, " "))
 
-	// Replace process with ssh so stdin/stdout/stderr pass through
-	// and the remote exit code is returned.
-	err = syscall.Exec(sshPath, sshArgs, os.Environ())
-	if err != nil {
-		return fmt.Errorf("exec ssh: %w", err)
-	}
-	return nil
+	return syscall.Exec(sshPath, sshArgs, os.Environ())
 }
