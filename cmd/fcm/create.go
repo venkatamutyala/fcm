@@ -19,14 +19,19 @@ import (
 )
 
 var createFlags struct {
-	image    string
-	cpus     int
-	memory   int
-	disk     int
-	sshKey   string
-	cloudInit string
-	ip       string
-	template string
+	image        string
+	cpus         int
+	memory       int
+	disk         int
+	sshKey       string
+	cloudInit    string
+	ip           string
+	template     string
+	forward      []string
+	isolated     bool
+	netBandwidth string
+	diskIOPS     int
+	diskBandwidth string
 }
 
 var createCmd = &cobra.Command{
@@ -45,6 +50,11 @@ func init() {
 	createCmd.Flags().StringVar(&createFlags.cloudInit, "cloud-init", "", "Path to cloud-init YAML file")
 	createCmd.Flags().StringVar(&createFlags.ip, "ip", "", "Static IP address for the VM (must be within configured subnet)")
 	createCmd.Flags().StringVar(&createFlags.template, "template", "", "Use a built-in template (see: fcm templates)")
+	createCmd.Flags().StringSliceVar(&createFlags.forward, "forward", nil, "Port forward in hostPort:vmPort format (can be repeated)")
+	createCmd.Flags().BoolVar(&createFlags.isolated, "isolated", false, "Isolate VM from other VMs on the bridge")
+	createCmd.Flags().StringVar(&createFlags.netBandwidth, "net-bandwidth", "", "Network bandwidth limit (e.g., 100mbps)")
+	createCmd.Flags().IntVar(&createFlags.diskIOPS, "disk-iops", 0, "Disk IOPS limit")
+	createCmd.Flags().StringVar(&createFlags.diskBandwidth, "disk-bandwidth", "", "Disk bandwidth limit (e.g., 50mbps)")
 	rootCmd.AddCommand(createCmd)
 }
 
@@ -173,22 +183,26 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		vmDir := vm.VMDir(name)
 
 		v = &vm.VM{
-			Name:       name,
-			Image:      createFlags.image,
-			Kernel:     cfg.DefaultKernel,
-			CPUs:       cpus,
-			MemoryMB:   memory,
-			DiskGB:     disk,
-			IP:         ip,
-			Gateway:    cfg.BridgeIP,
-			MAC:        mac,
-			TAPDevice:  tapDevice,
-			SocketPath: filepath.Join(vmDir, "fc.socket"),
-			RootfsPath: filepath.Join(vmDir, "rootfs.ext4"),
-			CIDataPath: filepath.Join(vmDir, "cidata.iso"),
-			SerialLog:  filepath.Join(vmDir, "console.log"),
-			CreatedAt:  time.Now(),
-			BootArgs:   network.BootArgs(ip, cfg.BridgeIP, cfg.BridgeMask),
+			Name:          name,
+			Image:         createFlags.image,
+			Kernel:        cfg.DefaultKernel,
+			CPUs:          cpus,
+			MemoryMB:      memory,
+			DiskGB:        disk,
+			IP:            ip,
+			Gateway:       cfg.BridgeIP,
+			MAC:           mac,
+			TAPDevice:     tapDevice,
+			SocketPath:    filepath.Join(vmDir, "fc.socket"),
+			RootfsPath:    filepath.Join(vmDir, "rootfs.ext4"),
+			CIDataPath:    filepath.Join(vmDir, "cidata.iso"),
+			SerialLog:     filepath.Join(vmDir, "console.log"),
+			CreatedAt:     time.Now(),
+			BootArgs:      network.BootArgs(ip, cfg.BridgeIP, cfg.BridgeMask),
+			Isolated:      createFlags.isolated,
+			NetBandwidth:  createFlags.netBandwidth,
+			DiskIOPS:      createFlags.diskIOPS,
+			DiskBandwidth: createFlags.diskBandwidth,
 		}
 
 		// Create VM directory
@@ -282,6 +296,23 @@ func runCreate(cmd *cobra.Command, args []string) error {
 
 	// Wait for SSH readiness
 	waitForSSH(v.IP, bootStart)
+
+	// Apply port forwards if requested
+	if len(createFlags.forward) > 0 {
+		// Reload v to get the saved state
+		v, err = vm.LoadVM(name)
+		if err != nil {
+			return fmt.Errorf("reload vm state for forwards: %w", err)
+		}
+		if v.Forwards == nil {
+			v.Forwards = make(map[string]string)
+		}
+		for _, fwd := range createFlags.forward {
+			if err := addForward(v, fwd); err != nil {
+				fmt.Printf("Warning: failed to add forward %s: %v\n", fwd, err)
+			}
+		}
+	}
 
 	fmt.Printf("\nVM %s created and started:\n", name)
 	fmt.Printf("  IP:     %s\n", v.IP)

@@ -15,23 +15,28 @@ const lockFile = "/var/lib/fcm/.lock"
 
 // VM represents the persisted state of a virtual machine.
 type VM struct {
-	Name       string            `json:"name"`
-	Image      string            `json:"image"`
-	Kernel     string            `json:"kernel"`
-	CPUs       int               `json:"cpus"`
-	MemoryMB   int               `json:"memory_mb"`
-	DiskGB     int               `json:"disk_gb"`
-	IP         string            `json:"ip"`
-	Gateway    string            `json:"gateway"`
-	MAC        string            `json:"mac"`
-	TAPDevice  string            `json:"tap_device"`
-	SocketPath string            `json:"socket_path"`
-	RootfsPath string            `json:"rootfs_path"`
-	CIDataPath string            `json:"cidata_path"`
-	SerialLog  string            `json:"serial_log"`
-	Tags       map[string]string `json:"tags,omitempty"`
-	CreatedAt  time.Time         `json:"created_at"`
-	BootArgs   string            `json:"boot_args"`
+	Name         string            `json:"name"`
+	Image        string            `json:"image"`
+	Kernel       string            `json:"kernel"`
+	CPUs         int               `json:"cpus"`
+	MemoryMB     int               `json:"memory_mb"`
+	DiskGB       int               `json:"disk_gb"`
+	IP           string            `json:"ip"`
+	Gateway      string            `json:"gateway"`
+	MAC          string            `json:"mac"`
+	TAPDevice    string            `json:"tap_device"`
+	SocketPath   string            `json:"socket_path"`
+	RootfsPath   string            `json:"rootfs_path"`
+	CIDataPath   string            `json:"cidata_path"`
+	SerialLog    string            `json:"serial_log"`
+	Tags         map[string]string `json:"tags,omitempty"`
+	CreatedAt    time.Time         `json:"created_at"`
+	BootArgs     string            `json:"boot_args"`
+	Forwards     map[string]string `json:"forwards,omitempty"`
+	Isolated     bool              `json:"isolated,omitempty"`
+	NetBandwidth string            `json:"net_bandwidth,omitempty"`
+	DiskIOPS     int               `json:"disk_iops,omitempty"`
+	DiskBandwidth string           `json:"disk_bandwidth,omitempty"`
 }
 
 // VMDir returns the directory for a given VM.

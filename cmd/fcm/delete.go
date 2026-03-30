@@ -44,6 +44,14 @@ var deleteCmd = &cobra.Command{
 		// Load VM state for cleanup
 		v, err := vm.LoadVM(name)
 		if err == nil {
+			// Clean up port forwards
+			cleanupAllForwards(v)
+
+			// Clean up isolation rules
+			if v.Isolated {
+				removeIsolationRules(v.IP)
+			}
+
 			// Clean up TAP device
 			_ = network.DeleteTAP(v.TAPDevice)
 		}

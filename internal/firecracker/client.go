@@ -31,19 +31,34 @@ type BootSource struct {
 	BootArgs        string `json:"boot_args"`
 }
 
+// RateLimiter configures rate limiting for a Firecracker resource.
+type RateLimiter struct {
+	Bandwidth *TokenBucket `json:"bandwidth,omitempty"`
+	Ops       *TokenBucket `json:"ops,omitempty"`
+}
+
+// TokenBucket defines the token bucket parameters for rate limiting.
+type TokenBucket struct {
+	Size       int64 `json:"size"`
+	OneTimeBurst int64 `json:"one_time_burst,omitempty"`
+	RefillTime int64 `json:"refill_time"` // milliseconds
+}
+
 // Drive configures a block device.
 type Drive struct {
-	DriveID      string `json:"drive_id"`
-	PathOnHost   string `json:"path_on_host"`
-	IsRootDevice bool   `json:"is_root_device"`
-	IsReadOnly   bool   `json:"is_read_only"`
+	DriveID      string       `json:"drive_id"`
+	PathOnHost   string       `json:"path_on_host"`
+	IsRootDevice bool         `json:"is_root_device"`
+	IsReadOnly   bool         `json:"is_read_only"`
+	RateLimiter  *RateLimiter `json:"rate_limiter,omitempty"`
 }
 
 // NetworkInterface configures a network device.
 type NetworkInterface struct {
-	IfaceID     string `json:"iface_id"`
-	GuestMAC    string `json:"guest_mac"`
-	HostDevName string `json:"host_dev_name"`
+	IfaceID     string       `json:"iface_id"`
+	GuestMAC    string       `json:"guest_mac"`
+	HostDevName string       `json:"host_dev_name"`
+	RateLimiter *RateLimiter `json:"rate_limiter,omitempty"`
 }
 
 // MachineConfig sets CPU and memory.

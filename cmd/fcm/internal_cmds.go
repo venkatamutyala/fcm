@@ -83,6 +83,20 @@ var setupVMCmd = &cobra.Command{
 			return fmt.Errorf("create tap: %w", err)
 		}
 
+		// Apply isolation rules if enabled
+		if v.Isolated {
+			if err := applyIsolationRules(v.IP, cfg.BridgeIP); err != nil {
+				return fmt.Errorf("apply isolation rules: %w", err)
+			}
+		}
+
+		// Re-apply port forward rules (they don't survive reboots)
+		for hostPort, vmPort := range v.Forwards {
+			if err := addForwardRules(hostPort, v.IP, vmPort); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: could not restore forward %s:%s: %v\n", hostPort, vmPort, err)
+			}
+		}
+
 		// Clean up stale socket
 		os.Remove(v.SocketPath)
 
@@ -103,6 +117,14 @@ var cleanupVMCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "warning: could not load vm state: %v\n", err)
 			return nil // always exit 0
 		}
+
+		// Remove isolation rules if enabled
+		if v.Isolated {
+			removeIsolationRules(v.IP)
+		}
+
+		// Remove port forward iptables rules
+		cleanupAllForwards(v)
 
 		// Remove TAP device (ignore errors)
 		_ = network.DeleteTAP(v.TAPDevice)
