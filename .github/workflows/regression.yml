@@ -130,15 +130,25 @@ jobs:
         run: |
           echo "Waiting for VM to boot..."
           for i in $(seq 1 60); do
-            if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            # Try SSH
+            RESULT=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o IdentitiesOnly=yes -o ConnectTimeout=5 -o BatchMode=yes \
-              -i ~/.ssh/id_ed25519 root@192.168.100.10 "echo OK" 2>/dev/null; then
+              -i ~/.ssh/id_ed25519 root@192.168.100.10 "echo OK" 2>&1) && {
               echo "SSH ready after $((i * 5))s"
               exit 0
+            }
+            # Every 30s, print diagnostic
+            if [ $((i % 6)) -eq 0 ]; then
+              echo "  Still waiting ($((i * 5))s)... ping=$(ping -c1 -W1 192.168.100.10 2>&1 | grep -c '1 received') ssh_err=$(echo $RESULT | tail -1)"
             fi
             sleep 5
           done
           echo "SSH failed after 300s"
+          echo "=== Final diagnostic ==="
+          ping -c1 -W2 192.168.100.10 || echo "Ping failed"
+          ssh -v -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o IdentitiesOnly=yes -o ConnectTimeout=5 \
+            -i ~/.ssh/id_ed25519 root@192.168.100.10 "echo OK" 2>&1 | tail -20
           sudo tail -50 /var/lib/fcm/vms/${{ env.VM_NAME }}/console.log || true
           exit 1
 
