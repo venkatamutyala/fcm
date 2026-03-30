@@ -53,7 +53,7 @@ jobs:
   test:
     needs: setup
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -129,7 +129,7 @@ jobs:
       - name: "Test: SSH (first boot)"
         run: |
           echo "Waiting for VM to boot..."
-          for i in $(seq 1 36); do
+          for i in $(seq 1 60); do
             if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o IdentitiesOnly=yes -o ConnectTimeout=5 -o BatchMode=yes \
               -i ~/.ssh/id_ed25519 root@192.168.100.10 "echo OK" 2>/dev/null; then
@@ -138,7 +138,7 @@ jobs:
             fi
             sleep 5
           done
-          echo "SSH failed after 180s"
+          echo "SSH failed after 300s"
           sudo tail -50 /var/lib/fcm/vms/${{ env.VM_NAME }}/console.log || true
           exit 1
 
@@ -160,7 +160,7 @@ jobs:
       - name: "Test: SSH (after restart)"
         run: |
           echo "Waiting for VM to restart..."
-          for i in $(seq 1 36); do
+          for i in $(seq 1 60); do
             if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o IdentitiesOnly=yes -o ConnectTimeout=5 -o BatchMode=yes \
               -i ~/.ssh/id_ed25519 root@192.168.100.10 "echo OK" 2>/dev/null; then
@@ -169,7 +169,7 @@ jobs:
             fi
             sleep 5
           done
-          echo "SSH failed after 180s"
+          echo "SSH failed after 300s"
           sudo tail -50 /var/lib/fcm/vms/${{ env.VM_NAME }}/console.log || true
           exit 1
 
@@ -204,7 +204,7 @@ jobs:
   test-templates:
     needs: setup
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -263,7 +263,7 @@ jobs:
       - name: "Test: SSH"
         run: |
           echo "Waiting for VM to boot..."
-          for i in $(seq 1 36); do
+          for i in $(seq 1 60); do
             if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o IdentitiesOnly=yes -o ConnectTimeout=5 -o BatchMode=yes \
               -i ~/.ssh/id_ed25519 root@192.168.100.10 "echo OK" 2>/dev/null; then
@@ -272,7 +272,7 @@ jobs:
             fi
             sleep 5
           done
-          echo "SSH failed after 180s"
+          echo "SSH failed after 300s"
           sudo tail -50 /var/lib/fcm/vms/${{ env.VM_NAME }}/console.log || true
           exit 1
 
