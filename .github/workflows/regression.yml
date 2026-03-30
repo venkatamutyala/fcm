@@ -219,19 +219,30 @@ jobs:
           sudo fcm delete ${{ env.VM_NAME }} --force
           sudo fcm list | grep -q "No VMs" && echo "Delete OK"
 
-      - name: Collect logs on failure
-        if: failure()
+      - name: Collect logs
+        if: always()
         run: |
-          echo "=== fcm list ==="
-          sudo fcm list || true
-          echo "=== fcm doctor ==="
-          sudo fcm doctor || true
-          echo "=== console.log ==="
-          sudo cat /var/lib/fcm/vms/${{ env.VM_NAME }}/console.log 2>/dev/null | tail -100 || true
-          echo "=== systemd status ==="
-          sudo systemctl status fcm-vm-${{ env.VM_NAME }}.service 2>/dev/null || true
-          echo "=== DHCP logs ==="
-          sudo journalctl -u fcm-dhcp.service --no-pager -n 20 || true
+          mkdir -p /tmp/fcm-logs
+          echo "=== fcm list ===" | tee /tmp/fcm-logs/summary.txt
+          sudo fcm list 2>&1 | tee -a /tmp/fcm-logs/summary.txt || true
+          echo "=== fcm doctor ===" | tee -a /tmp/fcm-logs/summary.txt
+          sudo fcm doctor 2>&1 | tee -a /tmp/fcm-logs/summary.txt || true
+          echo "=== vm.json ===" | tee -a /tmp/fcm-logs/summary.txt
+          sudo cat /var/lib/fcm/vms/${{ env.VM_NAME }}/vm.json 2>/dev/null | tee -a /tmp/fcm-logs/summary.txt || true
+          sudo cp /var/lib/fcm/vms/${{ env.VM_NAME }}/console.log /tmp/fcm-logs/console.log 2>/dev/null || true
+          sudo journalctl -u fcm-vm-${{ env.VM_NAME }}.service --no-pager 2>/dev/null > /tmp/fcm-logs/vm-service.log || true
+          sudo journalctl -u fcm-dhcp.service --no-pager -n 50 2>/dev/null > /tmp/fcm-logs/dhcp.log || true
+          sudo journalctl -u fcm-bridge.service --no-pager 2>/dev/null > /tmp/fcm-logs/bridge.log || true
+          sudo iptables -t nat -L -n 2>/dev/null > /tmp/fcm-logs/iptables-nat.txt || true
+          sudo ip addr 2>/dev/null > /tmp/fcm-logs/ip-addr.txt || true
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.image }}
+          path: /tmp/fcm-logs/
+          retention-days: 7
 
       - name: Cleanup
         if: always()
@@ -338,15 +349,22 @@ jobs:
           sudo fcm delete ${{ env.VM_NAME }} --force
           sudo fcm list | grep -q "No VMs" && echo "Delete OK"
 
-      - name: Collect logs on failure
-        if: failure()
+      - name: Collect logs
+        if: always()
         run: |
-          echo "=== fcm list ==="
-          sudo fcm list || true
-          echo "=== console.log ==="
-          sudo cat /var/lib/fcm/vms/${{ env.VM_NAME }}/console.log 2>/dev/null | tail -100 || true
-          echo "=== DHCP logs ==="
-          sudo journalctl -u fcm-dhcp.service --no-pager -n 20 || true
+          mkdir -p /tmp/fcm-logs
+          sudo fcm list 2>&1 > /tmp/fcm-logs/summary.txt || true
+          sudo cat /var/lib/fcm/vms/${{ env.VM_NAME }}/vm.json 2>/dev/null > /tmp/fcm-logs/vm.json || true
+          sudo cp /var/lib/fcm/vms/${{ env.VM_NAME }}/console.log /tmp/fcm-logs/console.log 2>/dev/null || true
+          sudo journalctl -u fcm-dhcp.service --no-pager -n 50 2>/dev/null > /tmp/fcm-logs/dhcp.log || true
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-template-${{ matrix.template }}
+          path: /tmp/fcm-logs/
+          retention-days: 7
 
       - name: Cleanup
         if: always()
