@@ -160,6 +160,24 @@ jobs:
       - name: "Test: inspect"
         run: sudo fcm inspect ${{ env.VM_NAME }}
 
+      - name: "Test: internet access"
+        run: |
+          IP=$(sudo cat /var/lib/fcm/vms/${{ env.VM_NAME }}/vm.json | python3 -c "import sys,json; print(json.load(sys.stdin)['ip'])")
+          RESULT=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o IdentitiesOnly=yes -o ConnectTimeout=10 -o BatchMode=yes \
+            -i ~/.ssh/id_ed25519 root@$IP "curl -sf --max-time 10 ifconfig.me" 2>/dev/null)
+          echo "External IP: $RESULT"
+          [ -n "$RESULT" ] || { echo "FAIL: no internet"; exit 1; }
+
+      - name: "Test: DNS resolution"
+        run: |
+          IP=$(sudo cat /var/lib/fcm/vms/${{ env.VM_NAME }}/vm.json | python3 -c "import sys,json; print(json.load(sys.stdin)['ip'])")
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o IdentitiesOnly=yes -o ConnectTimeout=10 -o BatchMode=yes \
+            -i ~/.ssh/id_ed25519 root@$IP "ping -c1 -W5 google.com" 2>/dev/null | grep -q "1 received" \
+            || { echo "FAIL: DNS not working"; exit 1; }
+          echo "DNS OK"
+
       - name: "Test: freeze"
         run: |
           sudo fcm freeze ${{ env.VM_NAME }}
@@ -174,6 +192,22 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             -o IdentitiesOnly=yes -o ConnectTimeout=10 -o BatchMode=yes \
             -i ~/.ssh/id_ed25519 root@192.168.100.10 "echo 'UNFREEZE SSH OK'"
+
+      - name: "Test: data persistence across freeze"
+        run: |
+          IP=$(sudo cat /var/lib/fcm/vms/${{ env.VM_NAME }}/vm.json | python3 -c "import sys,json; print(json.load(sys.stdin)['ip'])")
+          # Write data, freeze, unfreeze, verify data persists
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o IdentitiesOnly=yes -o ConnectTimeout=10 -o BatchMode=yes \
+            -i ~/.ssh/id_ed25519 root@$IP "echo persist-test-data > /tmp/fcm-persist-test"
+          sudo fcm freeze ${{ env.VM_NAME }}
+          sudo fcm unfreeze ${{ env.VM_NAME }}
+          sleep 3
+          RESULT=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o IdentitiesOnly=yes -o ConnectTimeout=10 -o BatchMode=yes \
+            -i ~/.ssh/id_ed25519 root@$IP "cat /tmp/fcm-persist-test" 2>/dev/null)
+          echo "After freeze/unfreeze: $RESULT"
+          [ "$RESULT" = "persist-test-data" ] || { echo "FAIL: data lost"; exit 1; }
 
       - name: "Test: backup + restore"
         run: |
@@ -275,12 +309,29 @@ jobs:
           sudo tail -50 /var/lib/fcm/vms/${{ env.VM_NAME }}/console.log || true
           exit 1
 
-      - name: "Test: verify template packages"
-        if: contains(matrix.template, 'docker')
+      - name: "Test: Docker inside VM"
+        if: matrix.template == 'ubuntu-dev'
         run: |
-          # Wait for cloud-init to finish installing packages
-          sleep 30
-          sudo fcm exec ${{ env.VM_NAME }} -- docker --version || echo "Docker not yet installed (cloud-init may still be running)"
+          IP=192.168.100.10
+          # Wait for cloud-init to finish installing Docker
+          echo "Waiting for Docker to be installed by cloud-init..."
+          for i in $(seq 1 24); do
+            if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o IdentitiesOnly=yes -o ConnectTimeout=5 -o BatchMode=yes \
+              -i ~/.ssh/id_ed25519 root@$IP "docker info" 2>/dev/null | grep -q "Server Version"; then
+              echo "Docker ready after $((i * 10))s"
+              break
+            fi
+            sleep 10
+          done
+          # Run nginx container
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o IdentitiesOnly=yes -o ConnectTimeout=10 -o BatchMode=yes \
+            -i ~/.ssh/id_ed25519 root@$IP "docker run -d -p 8080:80 nginx:alpine" 2>/dev/null
+          sleep 10
+          # Verify host can reach the container
+          curl -sf --max-time 10 http://$IP:8080 | head -3
+          echo "HOST REACHED DOCKER CONTAINER"
 
       - name: "Test: delete"
         run: |
