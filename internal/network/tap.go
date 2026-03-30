@@ -1,6 +1,7 @@
 package network
 
 import (
+	"crypto/sha256"
 	"fmt"
 )
 
@@ -40,11 +41,13 @@ func DeleteTAP(tapName string) error {
 
 // TAPName generates a TAP device name for a VM.
 // TAP device names are limited to 15 characters on Linux.
+// Uses a hash suffix to avoid collisions for long VM names.
 func TAPName(vmName string) string {
-	const prefix = "fcm-"
 	const maxLen = 15
-
-	name := prefix + vmName
+	prefix := "fc"
+	// Use first few chars + hash of full name to avoid collisions
+	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(vmName)))[:6]
+	name := prefix + hash
 	if len(name) > maxLen {
 		name = name[:maxLen]
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"fcm.dev/fcm-cli/internal/images"
 	"fcm.dev/fcm-cli/internal/systemd"
@@ -138,6 +139,10 @@ func runResize(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("write systemd unit: %w", err)
 		}
 	}
+
+	// Delete stale snapshot files so a stale snapshot isn't loaded on next unfreeze
+	os.Remove(filepath.Join(vm.VMDir(name), "snapshot.snap"))
+	os.Remove(filepath.Join(vm.VMDir(name), "snapshot.mem"))
 
 	// Save updated VM state
 	if err := vm.SaveVM(v); err != nil {

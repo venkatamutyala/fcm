@@ -430,9 +430,6 @@ func resolveImageURL(name string) (string, error) {
 		// Debian
 		"debian":    "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2",
 		"debian-12": "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2",
-		// Fedora
-		"fedora":    "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-41-1.4.x86_64.qcow2",
-		"fedora-41": "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-41-1.4.x86_64.qcow2",
 		// RHEL family
 		"rocky":          "https://download.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2",
 		"rocky-9":        "https://download.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2",
@@ -440,9 +437,6 @@ func resolveImageURL(name string) (string, error) {
 		"alma-9":         "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-latest.x86_64.qcow2",
 		"centos":         "https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2",
 		"centos-stream9": "https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2",
-		// Alpine (uses tiny-cloud, partial cloud-init compat)
-		"alpine":    "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/cloud/nocloud_alpine-3.20.0-x86_64-bios-cloudinit-r0.qcow2",
-		"alpine-3.20": "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/cloud/nocloud_alpine-3.20.0-x86_64-bios-cloudinit-r0.qcow2",
 		// Arch
 		"arch": "https://geo.mirror.pkgbuild.com/images/latest/Arch-Linux-x86_64-cloudimg.qcow2",
 		// openSUSE
@@ -474,10 +468,6 @@ func ImageFamilies() []ImageFamily {
 			{Name: "debian", Format: "qcow2"},
 			{Name: "debian-12", Format: "qcow2"},
 		}},
-		{Family: "Fedora", Images: []ImageInfo{
-			{Name: "fedora", Format: "qcow2"},
-			{Name: "fedora-41", Format: "qcow2"},
-		}},
 		{Family: "RHEL", Images: []ImageInfo{
 			{Name: "rocky", Format: "qcow2"},
 			{Name: "rocky-9", Format: "qcow2"},
@@ -485,10 +475,6 @@ func ImageFamilies() []ImageFamily {
 			{Name: "alma-9", Format: "qcow2"},
 			{Name: "centos", Format: "qcow2"},
 			{Name: "centos-stream9", Format: "qcow2"},
-		}},
-		{Family: "Alpine", Images: []ImageInfo{
-			{Name: "alpine", Format: "qcow2"},
-			{Name: "alpine-3.20", Format: "qcow2"},
 		}},
 		{Family: "Arch", Images: []ImageInfo{
 			{Name: "arch", Format: "qcow2"},
@@ -521,11 +507,9 @@ func availableImages() []string {
 	return []string{
 		"ubuntu", "ubuntu-24.04", "ubuntu-22.04",
 		"debian", "debian-12",
-		"fedora", "fedora-41",
 		"rocky", "rocky-9",
 		"alma", "alma-9",
 		"centos", "centos-stream9",
-		"alpine", "alpine-3.20",
 		"arch",
 		"opensuse", "opensuse-15.6",
 	}

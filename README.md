@@ -33,6 +33,8 @@ sudo fcm init
 
 That's it. Now create a VM:
 
+> **Note:** VMs have a default root password `fcm` for console access. SSH key authentication is the primary access method.
+
 ```bash
 # Launch a VM and SSH in (auto-detects your SSH key)
 sudo fcm run myvm --image ubuntu-24.04
@@ -43,7 +45,8 @@ Or step by step:
 ```bash
 sudo fcm create myvm --image ubuntu-24.04    # Create VM
 sudo fcm ssh myvm                            # SSH in
-sudo fcm stop myvm                           # Stop
+sudo fcm freeze myvm                         # Freeze (pause + save state)
+sudo fcm unfreeze myvm                       # Unfreeze (resume from state)
 sudo fcm delete myvm --force                 # Delete
 ```
 
@@ -88,9 +91,8 @@ fcm exec <name> -- <cmd>          # Run a command in a VM
 fcm console <name>                # Serial console (Ctrl+] to detach)
 
 # Lifecycle
-fcm stop <name>                   # Stop a VM
-fcm start <name>                  # Start a stopped VM
-fcm restart <name>                # Restart a VM
+fcm freeze <name>                 # Freeze a VM (pause + save state)
+fcm unfreeze <name>               # Unfreeze a VM (resume from state)
 fcm delete <name> [--force]       # Delete a VM
 fcm resize <name> --cpus 4        # Resize CPU/memory/disk
 

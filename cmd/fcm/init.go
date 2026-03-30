@@ -59,7 +59,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Step 1: Directory structure
-	fmt.Println("[1/5] Creating directory structure...")
+	fmt.Println("[1/6] Creating directory structure...")
 	if err := config.EnsureDirs(); err != nil {
 		return err
 	}
@@ -67,28 +67,28 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Step 2: Download Firecracker
 	fcPath := "/usr/local/bin/firecracker"
 	if _, err := os.Stat(fcPath); os.IsNotExist(err) {
-		fmt.Println("[2/5] Downloading Firecracker...")
+		fmt.Println("[2/6] Downloading Firecracker...")
 		if err := downloadFirecracker(fcPath); err != nil {
 			return fmt.Errorf("download firecracker: %w", err)
 		}
 	} else {
-		fmt.Println("[2/5] Firecracker already installed, skipping")
+		fmt.Println("[2/6] Firecracker already installed, skipping")
 	}
 
 	// Step 3: Download kernel
 	kernelPath := filepath.Join(config.DefaultBaseDir, "kernels", "vmlinux-default")
 	if _, err := os.Stat(kernelPath); os.IsNotExist(err) {
-		fmt.Println("[3/5] Downloading Linux kernel...")
+		fmt.Println("[3/6] Downloading Linux kernel...")
 		if err := downloadToFile(kernelURL, kernelPath); err != nil {
 			return fmt.Errorf("download kernel: %w", err)
 		}
 		fmt.Printf("    Saved to %s\n", kernelPath)
 	} else {
-		fmt.Println("[3/5] Kernel already present, skipping")
+		fmt.Println("[3/6] Kernel already present, skipping")
 	}
 
 	// Step 4: Write config
-	fmt.Println("[4/5] Writing config...")
+	fmt.Println("[4/6] Writing config...")
 	cfg, err := config.Load()
 	if err != nil {
 		return err

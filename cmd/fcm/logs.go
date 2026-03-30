@@ -21,8 +21,7 @@ var logsCmd = &cobra.Command{
 }
 
 func init() {
-	logsCmd.Flags().BoolVar(&logsFollow, "follow", false, "Follow log output")
-	logsCmd.Flags().BoolVarP(&logsFollow, "f", "f", false, "Follow log output")
+	logsCmd.Flags().BoolVarP(&logsFollow, "follow", "f", false, "Follow log output")
 	rootCmd.AddCommand(logsCmd)
 }
 

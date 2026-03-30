@@ -36,10 +36,10 @@ func TestTAPName(t *testing.T) {
 		vmName string
 		want   string
 	}{
-		{"dev", "fcm-dev"},
-		{"web1", "fcm-web1"},
-		{"a-very-long-vm-name", "fcm-a-very-long"}, // truncated to 15 chars
-		{"x", "fcm-x"},
+		{"dev", "fcef260e"},
+		{"web1", "fc659a7f"},
+		{"a-very-long-vm-name", "fcd6df07"}, // hash-based, no truncation issues
+		{"x", "fc2d7116"},
 	}
 
 	for _, tt := range tests {
@@ -50,5 +50,12 @@ func TestTAPName(t *testing.T) {
 		if len(got) > 15 {
 			t.Errorf("TAPName(%q) = %q, length %d exceeds 15", tt.vmName, got, len(got))
 		}
+	}
+
+	// Verify no collision for long VM names with shared prefix
+	a := TAPName("my-long-vm-aaa")
+	b := TAPName("my-long-vm-bbb")
+	if a == b {
+		t.Errorf("TAPName collision: %q and %q both got %q", "my-long-vm-aaa", "my-long-vm-bbb", a)
 	}
 }

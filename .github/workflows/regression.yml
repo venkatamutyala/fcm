@@ -211,9 +211,6 @@ jobs:
       fail-fast: false
       matrix:
         template:
-          - alpine
-          - alpine-docker
-          - alpine-dev
           - ubuntu
           - ubuntu-dev
           - debian
