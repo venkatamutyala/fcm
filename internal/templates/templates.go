@@ -81,6 +81,39 @@ runcmd:
 		Description: "Debian Server",
 		Image:       "debian-12",
 	},
+	"rocky": {
+		Name:        "rocky",
+		Description: "Rocky Linux 9",
+		Image:       "rocky-9",
+	},
+	"centos": {
+		Name:        "centos",
+		Description: "CentOS Stream 9",
+		Image:       "centos-stream9",
+	},
+	"opensuse": {
+		Name:        "opensuse",
+		Description: "openSUSE Leap 15.6",
+		Image:       "opensuse-15.6",
+	},
+	"k3s": {
+		Name:        "k3s",
+		Description: "Alpine + k3s (single-node Kubernetes)",
+		Image:       "alpine-3.20",
+		CPUs:        2,
+		Memory:      2048,
+		Disk:        20,
+		CloudInit: `runcmd:
+  - curl -sfL https://get.k3s.io | sh -`,
+	},
+	"tailscale": {
+		Name:        "tailscale",
+		Description: "Ubuntu + Tailscale",
+		Image:       "ubuntu-24.04",
+		CloudInit: `runcmd:
+  - curl -fsSL https://tailscale.com/install.sh | sh
+  - echo "Run: tailscale up --authkey=YOUR_KEY"`,
+	},
 }
 
 // Get returns the template with the given name, or nil if not found.

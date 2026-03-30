@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"fcm.dev/fcm-cli/internal/cloudinit"
@@ -238,6 +241,28 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	// Generate cloud-init CIDATA disk — handles SSH keys, networking, hostname
 	fmt.Println("Generating cloud-init...")
 	cloudInitFile := createFlags.cloudInit
+
+	// Support cloud-init from URL
+	if strings.HasPrefix(cloudInitFile, "http://") || strings.HasPrefix(cloudInitFile, "https://") {
+		fmt.Printf("Downloading cloud-init from %s...\n", cloudInitFile)
+		tmpFile := filepath.Join(vm.VMDir(name), "cloud-init-custom.yaml")
+		resp, err := http.Get(cloudInitFile)
+		if err != nil {
+			rollback()
+			return fmt.Errorf("download cloud-init: %w", err)
+		}
+		defer resp.Body.Close()
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			rollback()
+			return fmt.Errorf("read cloud-init: %w", err)
+		}
+		if err := os.WriteFile(tmpFile, data, 0600); err != nil {
+			rollback()
+			return fmt.Errorf("save cloud-init: %w", err)
+		}
+		cloudInitFile = tmpFile
+	}
 
 	// If using a template with cloud-init and no explicit --cloud-init, generate merged user-data
 	if cloudInitFile == "" && tmpl != nil && tmpl.CloudInit != "" {
