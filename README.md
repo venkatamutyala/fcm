@@ -2,9 +2,7 @@
 
 The CLI for [Firecracker](https://github.com/firecracker-microvm/firecracker) microVMs. One command to launch a full Linux VM with SSH access.
 
-<!-- TODO: Replace with actual asciinema recording
-[![asciicast](https://asciinema.org/a/XXXXX.svg)](https://asciinema.org/a/XXXXX)
--->
+**Requires:** Linux with KVM (bare metal or nested virtualization). x86_64 or arm64.
 
 ```bash
 $ sudo fcm run myvm --image ubuntu-24.04

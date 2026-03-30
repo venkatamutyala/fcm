@@ -4,27 +4,40 @@ All notable changes to fcm will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-03-30
 
 ### Added
 
-- `fcm init` - Initialize fcm: download Firecracker, kernel, and rootfs images
-- `fcm create` - Create a new Firecracker microVM with cloud-init support
-- `fcm start` - Start a stopped VM
-- `fcm stop` - Stop a running VM
-- `fcm delete` - Delete a VM and clean up all resources
-- `fcm list` - List all VMs and their status
-- `fcm ssh` - SSH into a running VM
-- `fcm console` - Attach to a VM serial console
-- `fcm inspect` - Show detailed VM configuration and status
-- `fcm logs` - View VM logs
-- `fcm backup` - Backup VM configuration and data
-- `fcm update` - Self-update fcm to the latest version
-- `fcm doctor` - Diagnose system readiness (KVM, networking, dependencies)
-- `fcm images` - Manage kernel and rootfs images
-- `fcm configure` - Configure VM settings
-- Automatic tap device and iptables NAT networking setup
-- systemd service integration for VM lifecycle
-- Cloud-init support for VM provisioning
-- Custom kernel build support
-- Docker-based development workflow
+- `fcm init` — one-time setup (downloads Firecracker + kernel, configures networking)
+- `fcm create` / `fcm delete` — VM lifecycle
+- `fcm run` — create + wait for SSH + connect in one command
+- `fcm freeze` / `fcm unfreeze` — pause and resume VMs via Firecracker snapshots
+- `fcm ssh` / `fcm exec` / `fcm console` — VM access (SSH, command execution, serial log)
+- `fcm cp` — copy files to/from VMs via SCP
+- `fcm stats` — VM resource usage (CPU, memory, disk, network)
+- `fcm resize` — change CPU, memory, or disk after creation
+- `fcm backup` / `fcm restore` — disk backups
+- `fcm templates` — built-in VM templates (ubuntu, ubuntu-dev, debian)
+- `fcm images` / `fcm pull` — image management
+- `fcm cleanup` — remove all VMs, services, and FCM state
+- `fcm doctor` — system health check
+- Embedded DHCP server (pure Go, no external dependencies)
+- Cloud-init via CIDATA vfat disk
+- Custom kernel from Amazon Linux source (vfat, iso9660, btrfs, containers, TUN)
+- Configurable subnet (`fcm init --subnet`)
+- Static IP assignment (`fcm create --ip`)
+- Auto-detect SSH key from ~/.ssh/*.pub
+- Download progress bars with speed
+- Boot timing display ("VM ready! booted in 3.2s")
+- Tab completion for VM names, images, and templates
+- Structured error messages with fix suggestions
+- Auto-install host dependencies in `fcm init`
+- Signed releases with cosign (keyless)
+- Docker container on ghcr.io/venkatamutyala/fcm
+
+### Supported Images
+
+- Ubuntu 24.04, Ubuntu 22.04
+- Debian 12
+- Rocky Linux 9, AlmaLinux 9, CentOS Stream 9
+- openSUSE Leap 15.6
