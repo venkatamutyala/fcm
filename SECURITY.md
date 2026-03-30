@@ -54,3 +54,11 @@ We follow coordinated disclosure. We ask that you:
 3. Do not access or modify data belonging to others.
 
 We will credit reporters in the release notes (unless you prefer to remain anonymous).
+
+## Runtime Security Model
+
+- VMs have a default root password `fcm` with password authentication enabled
+- `PermitRootLogin yes` is configured in all VM images
+- VMs on the same bridge network can communicate with each other (no isolation by default)
+- SSH connections from fcm use `StrictHostKeyChecking=no` for ephemeral VMs
+- For production use, disable password auth via custom cloud-init and use `--isolated` flag (planned)

@@ -2,7 +2,11 @@
 
 The CLI for [Firecracker](https://github.com/firecracker-microvm/firecracker) microVMs. One command to launch a full Linux VM with SSH access.
 
-**Requires:** Linux with KVM (bare metal or nested virtualization). x86_64 or arm64.
+**Host requirements:**
+- Linux with `/dev/kvm` (kernel 4.14+)
+- systemd (for VM lifecycle management)
+- iptables (for NAT networking)
+- x86_64 architecture (arm64 coming soon)
 
 ```bash
 $ sudo fcm run myvm --image ubuntu-24.04
@@ -22,7 +26,7 @@ Unlike containers, each VM runs its own Linux kernel with full isolation. Unlike
 ## Install
 
 ```bash
-# One-line install (Linux x86_64 or arm64, requires /dev/kvm)
+# One-line install (Linux x86_64, requires /dev/kvm)
 curl -fsSL https://raw.githubusercontent.com/venkatamutyala/fcm/main/install.sh | sudo bash
 
 # One-time setup — downloads Firecracker + kernel, configures networking
@@ -56,7 +60,7 @@ sudo fcm delete myvm --force                 # Delete
 | Boot time | ~3s | ~0s | ~30s | ~15s | ~5s |
 | Memory overhead | ~50MB | ~0 | ~512MB | ~512MB | ~100MB |
 | Single binary | Yes | No | No | No | No |
-| No daemon required | Yes | No | Yes | No | No |
+| Minimal daemon | Yes | No | Yes | No | No |
 | Multi-distro images | Yes | Yes | Yes | Ubuntu only | Yes |
 | Runs on bare metal | Yes | Yes | Yes | Yes | Yes |
 | Cloud-init support | Yes | No | Yes | Yes | Yes |
@@ -86,7 +90,11 @@ fcm create <name> --image <img>   # Create and start a VM
 fcm list                          # List all VMs
 fcm ssh <name>                    # SSH into a VM
 fcm exec <name> -- <cmd>          # Run a command in a VM
-fcm console <name>                # Serial console (Ctrl+] to detach)
+fcm console <name>                # View serial console output (Ctrl+C to stop)
+
+# Files
+fcm cp <vm>:/path ./local          # Copy files from VM
+fcm cp ./local <vm>:/path          # Copy files to VM
 
 # Lifecycle
 fcm freeze <name>                 # Freeze a VM (pause + save state)
@@ -94,14 +102,22 @@ fcm unfreeze <name>               # Unfreeze a VM (resume from state)
 fcm delete <name> [--force]       # Delete a VM
 fcm resize <name> --cpus 4        # Resize CPU/memory/disk
 
+# Info
+fcm stats <name>                    # VM resource usage
+fcm templates                       # List built-in templates
+
 # Images
 fcm images                        # List local images
 fcm images --available            # List all pullable images
 fcm pull <image>                  # Download a cloud image
+fcm import <name> <path>            # Import a local ext4 image
+fcm rmi <name>                      # Remove a cached image
 
 # Backups
 fcm backup <name>                 # Backup VM disk
 fcm restore <name> <backup>       # Restore from backup
+fcm backups <name>                  # List backups
+fcm backup-rm <name>                # Delete a backup
 
 # System
 fcm init                          # One-time setup
@@ -110,6 +126,8 @@ fcm cleanup --confirm             # Remove all VMs and FCM state
 fcm inspect <name>                # VM details (JSON)
 fcm logs <name> [--follow]        # systemd logs
 fcm version                       # Print version
+fcm self-update                     # Update fcm binary
+fcm completion bash                 # Generate shell completions
 ```
 
 ## How It Works
@@ -136,7 +154,7 @@ Host Machine (any Linux with /dev/kvm)
     └── vms/<name>/
         ├── vm.json      (VM config)
         ├── rootfs.ext4  (root filesystem)
-        ├── cidata.img   (cloud-init data)
+        ├── cidata.iso   (cloud-init data)
         └── console.log  (serial output)
 ```
 
@@ -164,9 +182,10 @@ Transparency matters when a tool runs as root. Here is exactly what `fcm init` d
 3. Downloads the Firecracker binary to `/usr/local/bin/firecracker`
 4. Downloads a Linux kernel to `/var/lib/fcm/kernels/vmlinux-default`
 5. Writes `/var/lib/fcm/config.json` with default settings
-6. Creates a network bridge `fcbr0` with IP `192.168.100.1/24`
-7. Adds iptables NAT rules for VM internet access
-8. Installs and starts systemd services:
+6. Enables IP forwarding (`net.ipv4.ip_forward=1`)
+7. Creates a network bridge `fcbr0` with IP `192.168.100.1/24`
+8. Adds iptables NAT rules for VM internet access
+9. Installs and starts systemd services:
    - `fcm-bridge.service` — manages the network bridge
    - `fcm-dhcp.service` — embedded DHCP server for VMs
 

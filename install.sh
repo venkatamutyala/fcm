@@ -51,6 +51,12 @@ main() {
 
   os="$(detect_os)"
   arch="$(detect_arch)"
+
+  if [ "$arch" = "arm64" ]; then
+    echo "[fcm] WARNING: arm64 kernel is not yet available. fcm may not work correctly on this architecture."
+    echo "[fcm] See https://github.com/${REPO} for updates on arm64 support."
+  fi
+
   version="$(get_latest_version)"
 
   info "Installing fcm ${version} (${os}/${arch})"

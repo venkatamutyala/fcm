@@ -165,8 +165,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Println("Next steps:")
 	fmt.Println("  fcm doctor              # verify everything works")
-	fmt.Println("  fcm pull alpine-3.20    # download an image")
-	fmt.Println("  fcm create my-vm --image alpine-3.20 --ssh-key ~/.ssh/id_ed25519.pub")
+	fmt.Println("  fcm pull ubuntu-24.04    # download an image")
+	fmt.Println("  fcm create my-vm --image ubuntu-24.04 --ssh-key ~/.ssh/id_ed25519.pub")
 	return nil
 }
 
