@@ -65,10 +65,10 @@ jobs:
           - alma-9
           - centos-stream9
           - opensuse-15.6
+          - alpine-3.20
           # TODO: Enable after fixes
           # - fedora-41      # Fix: download URL 404
           # - arch           # Fix: needs BTRFS kernel module
-          # - alpine-3.20   # Fix: no partition table, uses tiny-cloud
     steps:
       - name: Enable KVM
         run: |
@@ -209,11 +209,6 @@ jobs:
           echo "After freeze/unfreeze: $RESULT"
           [ "$RESULT" = "persist-test-data" ] || { echo "FAIL: data lost"; exit 1; }
 
-      - name: "Test: backup + restore"
-        run: |
-          sudo fcm backup ${{ env.VM_NAME }}
-          sudo fcm backups ${{ env.VM_NAME }}
-
       - name: "Test: delete"
         run: |
           sudo fcm delete ${{ env.VM_NAME }} --force
@@ -256,6 +251,9 @@ jobs:
       fail-fast: false
       matrix:
         template:
+          - alpine
+          - alpine-docker
+          - alpine-dev
           - ubuntu
           - ubuntu-dev
           - debian

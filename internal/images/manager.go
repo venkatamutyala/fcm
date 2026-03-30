@@ -106,13 +106,18 @@ func Pull(name string) error {
 	}
 	os.Remove(qcowPath)
 
-	// Step 3: Extract root partition
+	// Step 3: Extract root partition (or use raw directly if no partition table)
 	fmt.Println("[3/4] Extracting root partition...")
 	if err := extractRootPartition(rawPath, destPath); err != nil {
-		cleanup(rawPath, destPath)
-		return fmt.Errorf("extract rootfs: %w", err)
+		// No partition table — the raw image IS the rootfs (e.g., Alpine)
+		fmt.Println("    No partition table found, using raw image directly")
+		if err := os.Rename(rawPath, destPath); err != nil {
+			cleanup(rawPath, destPath)
+			return fmt.Errorf("rename raw to dest: %w", err)
+		}
+	} else {
+		os.Remove(rawPath)
 	}
-	os.Remove(rawPath)
 
 	// Step 4: Fix rootfs for Firecracker (remove references to boot/EFI partitions)
 	fmt.Println("[4/5] Patching rootfs for Firecracker...")
@@ -437,6 +442,9 @@ func resolveImageURL(name string) (string, error) {
 		"alma-9":         "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-latest.x86_64.qcow2",
 		"centos":         "https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2",
 		"centos-stream9": "https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2",
+		// Alpine
+		"alpine":      "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/cloud/nocloud_alpine-3.20.0-x86_64-bios-cloudinit-r0.qcow2",
+		"alpine-3.20": "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/cloud/nocloud_alpine-3.20.0-x86_64-bios-cloudinit-r0.qcow2",
 		// Arch
 		"arch": "https://geo.mirror.pkgbuild.com/images/latest/Arch-Linux-x86_64-cloudimg.qcow2",
 		// openSUSE
@@ -476,6 +484,10 @@ func ImageFamilies() []ImageFamily {
 			{Name: "centos", Format: "qcow2"},
 			{Name: "centos-stream9", Format: "qcow2"},
 		}},
+		{Family: "Alpine", Images: []ImageInfo{
+			{Name: "alpine", Format: "qcow2"},
+			{Name: "alpine-3.20", Format: "qcow2"},
+		}},
 		{Family: "Arch", Images: []ImageInfo{
 			{Name: "arch", Format: "qcow2"},
 		}},
@@ -510,6 +522,7 @@ func availableImages() []string {
 		"rocky", "rocky-9",
 		"alma", "alma-9",
 		"centos", "centos-stream9",
+		"alpine", "alpine-3.20",
 		"arch",
 		"opensuse", "opensuse-15.6",
 	}

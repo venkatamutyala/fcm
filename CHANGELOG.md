@@ -16,7 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - `fcm cp` — copy files to/from VMs via SCP
 - `fcm stats` — VM resource usage (CPU, memory, disk, network)
 - `fcm resize` — change CPU, memory, or disk after creation
-- `fcm backup` / `fcm restore` — disk backups
+- `fcm freeze` / `fcm unfreeze` — pause and resume VMs (snapshot-based, replaces backup/restore)
 - `fcm templates` — built-in VM templates (ubuntu, ubuntu-dev, debian)
 - `fcm images` / `fcm pull` — image management
 - `fcm cleanup` — remove all VMs, services, and FCM state

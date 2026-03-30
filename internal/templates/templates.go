@@ -18,6 +18,40 @@ type Template struct {
 }
 
 var builtinTemplates = map[string]Template{
+	"alpine": {
+		Name:        "alpine",
+		Description: "Alpine Linux (minimal, fast boot)",
+		Image:       "alpine-3.20",
+	},
+	"alpine-docker": {
+		Name:        "alpine-docker",
+		Description: "Alpine + Docker + Compose",
+		Image:       "alpine-3.20",
+		Memory:      1024,
+		CloudInit: `packages:
+  - docker
+  - docker-cli-compose
+runcmd:
+  - rc-update add docker default
+  - service docker start`,
+	},
+	"alpine-dev": {
+		Name:        "alpine-dev",
+		Description: "Alpine + Docker + dev tools",
+		Image:       "alpine-3.20",
+		Memory:      2048,
+		CloudInit: `packages:
+  - docker
+  - docker-cli-compose
+  - git
+  - make
+  - curl
+  - vim
+  - bash
+runcmd:
+  - rc-update add docker default
+  - service docker start`,
+	},
 	"ubuntu": {
 		Name:        "ubuntu",
 		Description: "Ubuntu Server",

@@ -29,8 +29,6 @@ func init() {
 	deleteCmd.ValidArgsFunction = completeVMNames
 	inspectCmd.ValidArgsFunction = completeVMNames
 	logsCmd.ValidArgsFunction = completeVMNames
-	backupCmd.ValidArgsFunction = completeVMNames
-	restoreCmd.ValidArgsFunction = completeVMNames
 	consoleCmd.ValidArgsFunction = completeVMNames
 	execCmd.ValidArgsFunction = completeVMNames
 	resizeCmd.ValidArgsFunction = completeVMNames

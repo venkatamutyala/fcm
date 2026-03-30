@@ -113,12 +113,6 @@ fcm pull <image>                  # Download a cloud image
 fcm import <name> <path>            # Import a local ext4 image
 fcm rmi <name>                      # Remove a cached image
 
-# Backups
-fcm backup <name>                 # Backup VM disk
-fcm restore <name> <backup>       # Restore from backup
-fcm backups <name>                  # List backups
-fcm backup-rm <name>                # Delete a backup
-
 # System
 fcm init                          # One-time setup
 fcm doctor                        # System health check
