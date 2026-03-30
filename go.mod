@@ -1,14 +1,12 @@
 module fcm.dev/fcm-cli
 
-go 1.23.0
-
-toolchain go1.23.12
+go 1.25.0
 
 require (
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/insomniacslk/dhcp v0.0.0-20260326115832-991c7910cf36
 	github.com/spf13/cobra v1.8.1
-	golang.org/x/sys v0.31.0
+	golang.org/x/sys v0.42.0
 )
 
 require (
