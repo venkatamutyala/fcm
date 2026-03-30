@@ -162,7 +162,7 @@ func parseUptime(raw string) UptimeInfo {
 
 			loadStr := strings.TrimSpace(rest[laIdx+len("load average:"):])
 			info.LoadAvg = loadStr
-			fmt.Sscanf(loadStr, "%f, %f, %f", &info.Load1, &info.Load5, &info.Load15)
+			_, _ = fmt.Sscanf(loadStr, "%f, %f, %f", &info.Load1, &info.Load5, &info.Load15)
 		}
 	}
 
@@ -176,11 +176,11 @@ func parseMemory(raw string) MemoryInfo {
 		if strings.HasPrefix(line, "Mem:") {
 			fields := strings.Fields(line)
 			if len(fields) >= 7 {
-				fmt.Sscanf(fields[1], "%d", &info.TotalMB)
-				fmt.Sscanf(fields[2], "%d", &info.UsedMB)
-				fmt.Sscanf(fields[3], "%d", &info.FreeMB)
+				_, _ = fmt.Sscanf(fields[1], "%d", &info.TotalMB)
+				_, _ = fmt.Sscanf(fields[2], "%d", &info.UsedMB)
+				_, _ = fmt.Sscanf(fields[3], "%d", &info.FreeMB)
 				if len(fields) >= 7 {
-					fmt.Sscanf(fields[6], "%d", &info.AvailMB)
+					_, _ = fmt.Sscanf(fields[6], "%d", &info.AvailMB)
 				}
 			}
 		}
@@ -216,15 +216,15 @@ func parseNetwork(raw string) NetworkInfo {
 		if strings.HasPrefix(trimmed, "RX:") && i+1 < len(lines) {
 			fields := strings.Fields(strings.TrimSpace(lines[i+1]))
 			if len(fields) >= 2 {
-				fmt.Sscanf(fields[0], "%d", &info.RXBytes)
-				fmt.Sscanf(fields[1], "%d", &info.RXPackets)
+				_, _ = fmt.Sscanf(fields[0], "%d", &info.RXBytes)
+				_, _ = fmt.Sscanf(fields[1], "%d", &info.RXPackets)
 			}
 		}
 		if strings.HasPrefix(trimmed, "TX:") && i+1 < len(lines) {
 			fields := strings.Fields(strings.TrimSpace(lines[i+1]))
 			if len(fields) >= 2 {
-				fmt.Sscanf(fields[0], "%d", &info.TXBytes)
-				fmt.Sscanf(fields[1], "%d", &info.TXPackets)
+				_, _ = fmt.Sscanf(fields[0], "%d", &info.TXBytes)
+				_, _ = fmt.Sscanf(fields[1], "%d", &info.TXPackets)
 			}
 		}
 	}
