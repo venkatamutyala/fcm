@@ -165,7 +165,7 @@ jobs:
           IP=$(sudo cat /var/lib/fcm/vms/${{ env.VM_NAME }}/vm.json | python3 -c "import sys,json; print(json.load(sys.stdin)['ip'])")
           RESULT=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             -o IdentitiesOnly=yes -o ConnectTimeout=10 -o BatchMode=yes \
-            -i ~/.ssh/id_ed25519 root@$IP "curl -sf --max-time 10 ifconfig.me" 2>/dev/null)
+            -i ~/.ssh/id_ed25519 root@$IP "curl -sf --max-time 10 ifconfig.me 2>/dev/null || wget -qO- --timeout=10 ifconfig.me 2>/dev/null" 2>/dev/null)
           echo "External IP: $RESULT"
           [ -n "$RESULT" ] || { echo "FAIL: no internet"; exit 1; }
 
@@ -175,7 +175,7 @@ jobs:
           # curl a hostname to prove DNS works (ifconfig.me uses IP, this uses hostname)
           RESULT=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             -o IdentitiesOnly=yes -o ConnectTimeout=10 -o BatchMode=yes \
-            -i ~/.ssh/id_ed25519 root@$IP "curl -sf --max-time 10 http://example.com" 2>/dev/null | head -1)
+            -i ~/.ssh/id_ed25519 root@$IP "curl -sf --max-time 10 http://example.com 2>/dev/null || wget -qO- --timeout=10 http://example.com 2>/dev/null" 2>/dev/null | head -1)
           [ -n "$RESULT" ] && echo "DNS OK" || { echo "FAIL: DNS not working"; exit 1; }
 
       - name: "Test: freeze"
