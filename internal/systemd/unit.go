@@ -204,6 +204,12 @@ func VMStatus(vmName string) string {
 		return "unknown"
 	}
 
+	// Check if frozen (snapshot exists but not running)
+	snapPath := filepath.Join("/var/lib/fcm/vms", vmName, "snapshot.snap")
+	if _, err := os.Stat(snapPath); err == nil {
+		return "frozen"
+	}
+
 	return "stopped"
 }
 

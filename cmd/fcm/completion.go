@@ -24,9 +24,8 @@ func completeImageNames(cmd *cobra.Command, args []string, toComplete string) ([
 func init() {
 	// Register VM name completion on commands that take a VM name
 	sshCmd.ValidArgsFunction = completeVMNames
-	stopCmd.ValidArgsFunction = completeVMNames
-	startCmd.ValidArgsFunction = completeVMNames
-	restartCmd.ValidArgsFunction = completeVMNames
+	freezeCmd.ValidArgsFunction = completeVMNames
+	unfreezeCmd.ValidArgsFunction = completeVMNames
 	deleteCmd.ValidArgsFunction = completeVMNames
 	inspectCmd.ValidArgsFunction = completeVMNames
 	logsCmd.ValidArgsFunction = completeVMNames

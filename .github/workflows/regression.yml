@@ -150,28 +150,20 @@ jobs:
       - name: "Test: inspect"
         run: sudo fcm inspect ${{ env.VM_NAME }}
 
-      - name: "Test: stop + start"
+      - name: "Test: freeze"
         run: |
-          sudo fcm stop ${{ env.VM_NAME }}
-          sudo fcm list | grep stopped
-          sudo fcm start ${{ env.VM_NAME }}
-          sudo fcm list | grep running
+          sudo fcm freeze ${{ env.VM_NAME }}
+          sudo fcm list | grep frozen
 
-      - name: "Test: SSH (after restart)"
+      - name: "Test: unfreeze + SSH"
         run: |
-          echo "Waiting for VM to restart..."
-          for i in $(seq 1 60); do
-            if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              -o IdentitiesOnly=yes -o ConnectTimeout=5 -o BatchMode=yes \
-              -i ~/.ssh/id_ed25519 root@192.168.100.10 "echo OK" 2>/dev/null; then
-              echo "SSH ready after $((i * 5))s"
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "SSH failed after 300s"
-          sudo tail -50 /var/lib/fcm/vms/${{ env.VM_NAME }}/console.log || true
-          exit 1
+          sudo fcm unfreeze ${{ env.VM_NAME }}
+          sudo fcm list | grep running
+          # SSH should work immediately — VM resumes with sshd already running
+          sleep 2
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o IdentitiesOnly=yes -o ConnectTimeout=10 -o BatchMode=yes \
+            -i ~/.ssh/id_ed25519 root@192.168.100.10 "echo 'UNFREEZE SSH OK'"
 
       - name: "Test: backup + restore"
         run: |

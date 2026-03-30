@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"fcm.dev/fcm-cli/internal/firecracker"
@@ -28,7 +30,29 @@ var configureVMCmd = &cobra.Command{
 
 		fc := firecracker.NewClient(v.SocketPath)
 
-		// Configure in the required order: machine-config, boot-source, drives, network, then start
+		// Check if this is an unfreeze (snapshot exists)
+		vmDir := vm.VMDir(name)
+		snapPath := filepath.Join(vmDir, "snapshot.snap")
+		memPath := filepath.Join(vmDir, "snapshot.mem")
+		if _, err := os.Stat(snapPath); err == nil {
+			fmt.Printf("Restoring %s from snapshot...\n", name)
+			if err := fc.LoadSnapshot(firecracker.SnapshotLoad{
+				SnapshotPath: snapPath,
+				MemBackend: firecracker.MemBackend{
+					BackendPath: memPath,
+					BackendType: "File",
+				},
+			}); err != nil {
+				return fmt.Errorf("load snapshot: %w", err)
+			}
+			if err := fc.ResumeVM(); err != nil {
+				return fmt.Errorf("resume vm: %w", err)
+			}
+			fmt.Printf("VM %s resumed from snapshot\n", name)
+			return nil
+		}
+
+		// Normal boot: configure in the required order
 		fmt.Printf("Configuring %s...\n", name)
 
 		if err := fc.PutMachineConfig(firecracker.MachineConfig{
