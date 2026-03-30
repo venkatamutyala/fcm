@@ -85,9 +85,10 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// --image is required if no template is set
+	// Default to ubuntu-24.04 if no image or template is set
 	if createFlags.image == "" {
-		return fmt.Errorf("--image is required (or use --template)")
+		createFlags.image = "ubuntu-24.04"
+		fmt.Println("Using default image: ubuntu-24.04")
 	}
 
 	// Apply defaults: template values override config defaults, explicit flags override everything

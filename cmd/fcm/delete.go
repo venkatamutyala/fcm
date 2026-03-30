@@ -28,7 +28,12 @@ var deleteCmd = &cobra.Command{
 		unit := systemd.VMUnitName(name)
 		if systemd.IsActive(unit) {
 			if !deleteForce {
-				return fmt.Errorf("vm %q is running (use --force to stop and delete)", name)
+				fmt.Printf("VM %q is running. Delete anyway? [y/N]: ", name)
+				var response string
+				fmt.Scanln(&response)
+				if response != "y" && response != "Y" {
+					return fmt.Errorf("cancelled")
+				}
 			}
 			fmt.Printf("Stopping %s...\n", name)
 			if err := systemd.Stop(unit); err != nil {

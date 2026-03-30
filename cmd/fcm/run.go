@@ -40,6 +40,12 @@ func init() {
 }
 
 func runRun(cmd *cobra.Command, args []string) error {
+	// Default to ubuntu-24.04 if no image or template specified
+	if runFlags.image == "" && runFlags.template == "" {
+		runFlags.image = "ubuntu-24.04"
+		fmt.Println("Using default image: ubuntu-24.04")
+	}
+
 	// Copy flags into createFlags so runCreate can use them
 	createFlags.image = runFlags.image
 	createFlags.cpus = runFlags.cpus

@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"syscall"
 
 	"fcm.dev/fcm-cli/internal/vm"
 	"github.com/spf13/cobra"
@@ -39,13 +38,19 @@ func runExec(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no command specified (use: fcm exec %s -- <command>)", name)
 	}
 
+	remoteCmd := strings.Join(remoteArgs, " ")
+
 	sshPath, err := exec.LookPath("ssh")
 	if err != nil {
 		return fmt.Errorf("ssh not found: %w", err)
 	}
 
 	sshArgs := sshBaseArgs(v.IP)
-	sshArgs = append(sshArgs, strings.Join(remoteArgs, " "))
+	sshArgs = append(sshArgs, remoteCmd)
 
-	return syscall.Exec(sshPath, sshArgs, os.Environ())
+	c := exec.Command(sshPath, sshArgs[1:]...)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c.Run()
 }
