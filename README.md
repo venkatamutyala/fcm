@@ -35,7 +35,7 @@ sudo fcm init
 
 That's it. Now create a VM:
 
-> **Note:** VMs have a default root password `fcm` for console access. SSH key authentication is the primary access method.
+> **Note:** Each VM gets a unique random root password for console access (printed at creation). SSH key authentication is the primary access method.
 
 ```bash
 # Launch a VM and SSH in (auto-detects your SSH key)

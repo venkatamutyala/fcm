@@ -1,12 +1,21 @@
 package cloudinit
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
+
+// generatePassword generates a random alphanumeric password.
+func generatePassword(length int) string {
+	b := make([]byte, length)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)[:length]
+}
 
 // GenerateCloudInitDisk creates a NoCloud cloud-init vfat disk image.
 // Uses vfat instead of ISO 9660 because Firecracker kernels typically
@@ -113,6 +122,9 @@ func maskToCIDRBits(mask string) string {
 	}
 }
 
+// LastGeneratedPassword holds the root password from the most recent cloud-init generation.
+var LastGeneratedPassword string
+
 // DefaultUserData generates the base cloud-init user-data with hostname,
 // SSH key, and root password configuration.
 func DefaultUserData(hostname, sshPubKey string) string {
@@ -143,10 +155,12 @@ func defaultUserData(hostname, sshPubKey string) string {
 		cfg += fmt.Sprintf("  - %s\n", sshPubKey)
 	}
 
-	// Root password for console access
+	// Random root password for console access (unique per VM)
+	password := generatePassword(12)
+	LastGeneratedPassword = password
 	cfg += "chpasswd:\n"
 	cfg += "  list: |\n"
-	cfg += "    root:fcm\n"
+	cfg += fmt.Sprintf("    root:%s\n", password)
 	cfg += "  expire: false\n"
 
 	// SSH and root config

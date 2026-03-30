@@ -348,6 +348,9 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("\nAccess:\n")
 	fmt.Printf("  SSH:     ssh root@%s\n", v.IP)
 	fmt.Printf("  Console: fcm console %s\n", name)
+	if cloudinit.LastGeneratedPassword != "" {
+		fmt.Printf("  Password: %s (console login)\n", cloudinit.LastGeneratedPassword)
+	}
 	return nil
 }
 
