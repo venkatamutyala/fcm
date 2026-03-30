@@ -30,7 +30,7 @@ var deleteCmd = &cobra.Command{
 			if !deleteForce {
 				fmt.Printf("VM %q is running. Delete anyway? [y/N]: ", name)
 				var response string
-				fmt.Scanln(&response)
+				_, _ = fmt.Scanln(&response)
 				if response != "y" && response != "Y" {
 					return fmt.Errorf("cancelled")
 				}
