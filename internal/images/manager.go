@@ -264,14 +264,16 @@ func patchRootfsForFirecracker(ext4Path string) error {
 		os.Remove(filepath.Join(mountDir, "usr", "lib", "systemd", "system-generators", "sshd-socket-generator"))
 		_ = os.Symlink("/dev/null", filepath.Join(systemdDir, "ssh.socket"))
 
-		// Enable sshd via a custom systemd service (more reliable than cron @reboot)
+		// Enable sshd via a custom systemd service
+		// Generate host keys on start if missing (handles fresh images and key regeneration)
 		fcmSSHD := `[Unit]
 Description=FCM SSH Server
-After=basic.target
+After=basic.target network.target
 
 [Service]
 Type=simple
 ExecStartPre=/bin/mkdir -p /run/sshd
+ExecStartPre=/bin/bash -c 'for t in rsa ecdsa ed25519; do [ -f /etc/ssh/ssh_host_${t}_key ] || ssh-keygen -t $t -f /etc/ssh/ssh_host_${t}_key -N "" -q; done'
 ExecStart=/usr/sbin/sshd -D
 Restart=always
 RestartSec=2
