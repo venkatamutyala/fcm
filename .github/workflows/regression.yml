@@ -43,7 +43,7 @@ jobs:
           ls -lh vmlinux-fcm
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fcm-artifacts
           path: |
@@ -236,7 +236,7 @@ jobs:
 
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: logs-${{ matrix.image }}
           path: /tmp/fcm-logs/
@@ -361,7 +361,7 @@ jobs:
 
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: logs-template-${{ matrix.template }}
           path: /tmp/fcm-logs/
